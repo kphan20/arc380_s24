@@ -113,6 +113,7 @@ class EETaskHandler:
             self.move_to_point(corner, speed)
 
         self.move_to_point(corners[0])
+        self.move_to_point(self.lift_pen(corners[0]))
 
     # draw curved line given set of control points (2e)
     def draw_curve(self, control_points: list[cg.Point]):
@@ -166,7 +167,7 @@ class EETaskHandler:
         """center is in task frame, theta is rotation around task frame z axis"""
 
         hl, hw = length / 2, width / 2
-        delta = 1  # distance between hashes
+        delta = 5  # TODO tune distance between hashes
         hatches = []
         x, y = -hw, hl
 
@@ -200,7 +201,7 @@ class EETaskHandler:
 
         # rotate and translate each rectangle to match border rectangle
         rotation = cg.Rotation.from_axis_and_angle(cg.Vector.Zaxis, theta)
-        translation = cg.Translation([center.x, center.y, center.z])
+        translation = cg.Translation.from_vector([center.x, center.y, center.z])
 
         speed = 30
         for hatch in hatches:
@@ -209,6 +210,8 @@ class EETaskHandler:
             self.move_to_point(self.lift_pen(start_t), speed)
             self.move_to_point(start_t, speed)
             self.move_to_point(end_t, speed)
+
+        self.move_to_point(self.lift_pen(end_t), speed)
 
 
 # ========================================================================================
