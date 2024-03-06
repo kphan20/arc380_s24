@@ -110,6 +110,54 @@ class EETaskHandler:
 
         self.move_to_point(corners[0])
 
+    def draw_hatch(self, center: cg.Point, length: float, width: float, theta: float):
+        """center is in task frame, theta is rotation around task frame z axis"""
+
+        hl, hw = length / 2, width / 2
+        delta = 1  # distance between hashes
+        hatches = []
+        x, y = -hw, hl
+
+        def get_hatch():
+            # helper function to generate each nonce
+            nonlocal x, y, hw, hl
+
+            # checks which edge the hatch intersects
+            y_potential = -hw - x + y
+            x_potential = -hl - y + x
+            d1 = hw**2 + y_potential**2
+            d2 = hl**2 + x_potential**2
+            if d1 < d2:
+                hatch = (cg.Point(x, y), cg.Point(-hw, y_potential))
+            else:
+                hatch = (cg.Point(x, y), cg.Point(x_potential, -hl))
+
+            return hatch
+
+        # find hatches originating from top edge
+        while x + delta < hw:
+            x += delta
+            hatches.append(get_hatch())
+
+        x = hw
+
+        # find hatches originating from right edge
+        while y - delta > -hl:
+            y -= delta
+            hatches.append(get_hatch())
+
+        # rotate and translate each rectangle to match border rectangle
+        rotation = cg.Rotation.from_axis_and_angle(cg.Vector.Zaxis, theta)
+        translation = cg.Translation([center.x, center.y, center.z])
+
+        speed = 30
+        for hatch in hatches:
+            rotated_hatch = cg.Point.transformed_collection(hatch, rotation)
+            start_t, end_t = cg.Point.transformed_collection(rotated_hatch, translation)
+            self.move_to_point(self.lift_pen(start_t), speed)
+            self.move_to_point(start_t, speed)
+            self.move_to_point(end_t, speed)
+
 
 # ========================================================================================
 
