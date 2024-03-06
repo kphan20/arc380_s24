@@ -102,7 +102,7 @@ class EETaskHandler:
         corners = [top_left, top_right, bot_right, bot_left]
 
         # rotate each point around the rectangle's center
-        rotation = cg.Rotation.from_axis_and_angle(cg.Vector.Zaxis, theta, center)
+        rotation = cg.Rotation.from_axis_and_angle(cg.Vector.Zaxis(), theta, center)
         cg.Point.transform_collection(corners, rotation)
 
         # move pen to corners and draw when appropriate
@@ -145,7 +145,7 @@ class EETaskHandler:
 
         # TODO verify shift of y axis to be parallel to line
         local_x = line.direction
-        local_y = local_x.cross(cg.Vector.Zaxis)
+        local_y = local_x.cross(cg.Vector.Zaxis())
 
         # create jittered points
         jittered_points = []
@@ -171,9 +171,8 @@ class EETaskHandler:
         hatches = []
         x, y = -hw, hl
 
+        # helper function to generate each hatch
         def get_hatch():
-            # helper function to generate each nonce
-            nonlocal x, y, hw, hl
 
             # checks which edge the hatch intersects
             y_potential = -hw - x + y
@@ -188,7 +187,7 @@ class EETaskHandler:
             return hatch
 
         # find hatches originating from top edge
-        while x + delta < hw:
+        while x + delta <= hw:
             x += delta
             hatches.append(get_hatch())
 
@@ -200,7 +199,7 @@ class EETaskHandler:
             hatches.append(get_hatch())
 
         # rotate and translate each rectangle to match border rectangle
-        rotation = cg.Rotation.from_axis_and_angle(cg.Vector.Zaxis, theta)
+        rotation = cg.Rotation.from_axis_and_angle(cg.Vector.Zaxis(), theta)
         translation = cg.Translation.from_vector([center.x, center.y, center.z])
 
         speed = 30
