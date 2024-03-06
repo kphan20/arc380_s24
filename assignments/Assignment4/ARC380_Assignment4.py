@@ -1,6 +1,7 @@
 import numpy as np
 import compas.geometry as cg
 import compas_rrc as rrc
+import random
 
 # Define any additional imports here if needed
 
@@ -110,6 +111,53 @@ class EETaskHandler:
 
         self.move_to_point(corners[0])
 
+    # draw curved line given set of control points (2e)
+    def draw_curve(self, control_points: list[cg.Point]):
+        
+        # construct bezier curve
+        curve = cg.Bezier(control_points)
+        # sample curve
+        sampled_points = []
+        for i in range(0, 1, 0.01): # TODO test step size (currently 1%)
+            sampled_points.append(curve.point_at(i))
+
+        # move pen to start and draw
+        speed = 30
+        self.move_to_point(self.lift_pen(sampled_points[0]), speed)
+
+        for point in sampled_points:
+            self.move_to_point(point, speed)
+
+        # lift pen at end
+        self.move_to_point(self.lift_pen(sampled_points[-1]), speed)
+
+    # create a line that randomly jitters along its length (2h)
+    def jitter_line(self, start: cg.Point, end: cg.Point):
+        # create line
+        line = cg.Line(start, end)
+
+        # set max jitter distance
+        max_jitter = line.length / 5 # TODO test value
+
+        # TODO verify shift of y axis to be parallel to line
+        local_x = line.direction
+        local_y = local_x.cross(cg.Vector.Zaxis)
+        
+        # create jittered points
+        jittered_points = []
+        for i in range(0, 1, 0.01): # TODO test step size (currently 1%)
+            jitter = random.uniform(-max_jitter, max_jitter)
+            jittered_points.append(line.point_at(i) + local_y * jitter)
+
+        # move pen to start and draw
+        speed = 30
+        self.move_to_point(self.lift_pen(jittered_points[0]), speed)
+
+        for point in jittered_points:
+            self.move_to_point(point, speed)
+
+        # lift pen at end
+        self.move_to_point(self.lift_pen(jittered_points[-1]), speed)
 
 # ========================================================================================
 
