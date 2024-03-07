@@ -2,6 +2,7 @@ import numpy as np
 import compas.geometry as cg
 import compas_rrc as rrc
 import random
+import math
 
 # Define any additional imports here if needed
 
@@ -68,11 +69,13 @@ class EETaskHandler:
         when we want to move the pen but not draw"""
 
         return cg.Point(
-            dest.x, dest.y, dest.z - 5
+            dest.x, dest.y, dest.z + 5
         )  # TODO test values for lift, when to call this function
 
     def move_to_point(self, dest: cg.Point, speed: float, quat: cg.Quaternion = None):
         """Helper function that handles conversion to world frame and command sending"""
+
+        dest.z = dest.z - 5
 
         if quat is None:
             frame = cg.Frame(dest, [1, 0, 0], [0, -1, 0])
@@ -84,6 +87,7 @@ class EETaskHandler:
         _ = self.abb_rrc.send_and_wait(
             rrc.MoveToFrame(frame_w, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
         )
+        print("Moved to point")
 
     def move_to_origin(self):
         """Moves robot to task space origin"""
@@ -113,8 +117,8 @@ class EETaskHandler:
         for corner in corners:
             self.move_to_point(corner, speed)
 
-        self.move_to_point(corners[0])
-        self.move_to_point(self.lift_pen(corners[0]))
+        self.move_to_point(corners[0], speed)
+        self.move_to_point(self.lift_pen(corners[0]), speed)
 
     # draw curved line given set of control points (2e)
     def draw_curve(self, control_points: list[cg.Point]):
@@ -122,9 +126,9 @@ class EETaskHandler:
         # construct bezier curve
         curve = cg.Bezier(control_points)
         # sample curve
-        sampled_points = []
-        for i in range(0, 1, 0.01):  # TODO test step size (currently 1%)
-            sampled_points.append(curve.point_at(i))
+        sampled_points = curve.locus(100)
+        #for i in range(0, 1, 0.01):  # TODO test step size (currently 1%)
+            #sampled_points.append(curve.point_at(i))
 
         # move pen to start and draw
         speed = 30
@@ -142,7 +146,7 @@ class EETaskHandler:
         line = cg.Line(start, end)
 
         # set max jitter distance
-        max_jitter = line.length / 5  # TODO test value
+        max_jitter = line.length / 20  # TODO test value
 
         # TODO verify shift of y axis to be parallel to line
         local_x = line.direction
@@ -150,9 +154,10 @@ class EETaskHandler:
 
         # create jittered points
         jittered_points = []
-        for i in range(0, 1, 0.01):  # TODO test step size (currently 1%)
+        for i in range(1, 100):  # TODO test step size (currently 1%)
+            intervs = i / 100.0
             jitter = random.uniform(-max_jitter, max_jitter)
-            jittered_points.append(line.point_at(i) + local_y * jitter)
+            jittered_points.append(line.point(intervs) + local_y * jitter)
 
         # move pen to start and draw
         speed = 30
@@ -262,10 +267,11 @@ if __name__ == "__main__":
     handler = EETaskHandler(abb_rrc, task_frame)
 
     handler.move_to_origin()
-    # handler.draw_rectangle()
-    # handler.draw_curve()
-    # handler.jitter_line()
-    # handler.draw_hatch()
+    #handler.draw_rectangle(cg.Point(0, 0), 100, 100, math.pi / 4)
+    #curve_list = [cg.Point(0, 0), cg.Point(100, 50), cg.Point(150, 100)]
+    #handler.draw_curve(curve_list)
+    #handler.jitter_line(cg.Point(0, 0), cg.Point(-50, -50))
+    handler.draw_hatch()
 
     # ====================================================================================
 
