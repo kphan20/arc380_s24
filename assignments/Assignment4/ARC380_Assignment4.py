@@ -127,8 +127,8 @@ class EETaskHandler:
         curve = cg.Bezier(control_points)
         # sample curve
         sampled_points = curve.locus(100)
-        #for i in range(0, 1, 0.01):  # TODO test step size (currently 1%)
-            #sampled_points.append(curve.point_at(i))
+        # for i in range(0, 1, 0.01):  # TODO test step size (currently 1%)
+        # sampled_points.append(curve.point_at(i))
 
         # move pen to start and draw
         speed = 30
@@ -240,7 +240,7 @@ class EETaskHandler:
             self.move_to_point(point, speed)
 
         self.move_to_point(points[0], speed)
-        self.move_to_point(self.lift_pen(points[0]))
+        self.move_to_point(self.lift_pen(points[0]), speed)
 
 
 # ========================================================================================
@@ -267,10 +267,10 @@ if __name__ == "__main__":
     handler = EETaskHandler(abb_rrc, task_frame)
 
     handler.move_to_origin()
-    #handler.draw_rectangle(cg.Point(0, 0), 100, 100, math.pi / 4)
-    #curve_list = [cg.Point(0, 0), cg.Point(100, 50), cg.Point(150, 100)]
-    #handler.draw_curve(curve_list)
-    #handler.jitter_line(cg.Point(0, 0), cg.Point(-50, -50))
+    # handler.draw_rectangle(cg.Point(0, 0), 100, 100, math.pi / 4)
+    # curve_list = [cg.Point(0, 0), cg.Point(100, 50), cg.Point(150, 100)]
+    # handler.draw_curve(curve_list)
+    # handler.jitter_line(cg.Point(0, 0), cg.Point(-50, -50))
     handler.draw_hatch()
 
     # ====================================================================================
