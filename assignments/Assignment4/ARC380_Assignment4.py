@@ -214,24 +214,19 @@ class EETaskHandler:
 
     # Draw a circle of any size given its radius and center point. (2c)
     def draw_circle(self, radius: float, center: cg.Point):
-        
-        
-       # define the plane along x/y
-        plane = cg.Plane([center, [0, 0, 1]])
-
-        # create circle
-        circle = cg.Circle(plane, radius) # TODO i think this line might have an error.. why is circle undefined lol
 
         # creates a list of points from the circle
         points = []
-        for i in range(0, 1, 0.01):  # TODO test step size (currently 1%) -- is it np.arange or just range?
-            angle = 2 * np.pi * i # breaks up the circum of the circle into essentially 100 points 
-            x = center[0] + radius * np.cos(angle) # finding points along the radius
-            y = center[1] + radius * np.sin(angle) # finding points along the radius 
+        for i in range(100):
+            angle = (
+                2 * np.pi * i / 100
+            )  # breaks up the circum of the circle into essentially 100 points
+            x = center[0] + radius * np.cos(angle)  # finding points along the radius
+            y = center[1] + radius * np.sin(angle)  # finding points along the radius
             z = center[2]  # Circle is in the XY plane, so Z is constant
-            points.append(cg.Point(x, y, z)) 
+            points.append(cg.Point(x, y, z))
 
-        # moving to the points & drawing 
+        # moving to the points & drawing
         speed = 30
         self.move_to_point(self.lift_pen(points[0]), speed)
 
