@@ -75,7 +75,7 @@ class EETaskHandler:
         """Helper function that handles conversion to world frame and command sending"""
 
         if quat is None:
-            frame = cg.Frame(dest, self.task_frame.xaxis, self.task_frame.yaxis)
+            frame = cg.Frame(dest, [1, 0, 0], [0, -1, 0])
         else:
             frame = cg.Frame.from_quaternion(quat, dest)
 
