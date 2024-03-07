@@ -68,25 +68,26 @@ class EETaskHandler:
         when we want to move the pen but not draw"""
 
         return cg.Point(
-            dest.x, dest.y, dest.z + 5
+            dest.x, dest.y, dest.z - 5
         )  # TODO test values for lift, when to call this function
 
     def move_to_point(self, dest: cg.Point, speed: float, quat: cg.Quaternion = None):
         """Helper function that handles conversion to world frame and command sending"""
 
         if quat is None:
-            frame = cg.Frame(dest, self.task_frame.xaxis, self.task_frame.yaxis)
+            frame = cg.Frame(dest, [1, 0, 0], [0, -1, 0])
         else:
             frame = cg.Frame.from_quaternion(quat, dest)
 
         frame_w = transform_task_to_world_frame(frame, self.task_frame)
+        print(frame_w)
         _ = self.abb_rrc.send_and_wait(
             rrc.MoveToFrame(frame_w, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
         )
 
     def move_to_origin(self):
         """Moves robot to task space origin"""
-        self.move_to_point(cg.Point(0, 0), 10)
+        self.move_to_point(self.lift_pen(cg.Point(0, 0)), 30)
 
     def draw_rectangle(
         self, center: cg.Point, length: float, width: float, theta: float
@@ -251,9 +252,20 @@ if __name__ == "__main__":
     print("Connected.")
 
     # ================================== YOUR CODE HERE ==================================
-    abb_rrc.send(rrc.SetTool(""))  # TODO insert tool name
+    abb_rrc.send(rrc.SetTool("group3"))
 
     # Parts 1.e. and 2
+    origin = cg.Point(163.27, 407.60, 30.92)
+    x_axis = cg.Point(163.27, 554.01, 31.41)
+    other_point = cg.Point(-26.05, 545.02, 30.88)
+    task_frame = create_frame_from_points(origin, x_axis, other_point)
+    handler = EETaskHandler(abb_rrc, task_frame)
+
+    handler.move_to_origin()
+    # handler.draw_rectangle()
+    # handler.draw_curve()
+    # handler.jitter_line()
+    # handler.draw_hatch()
 
     # ====================================================================================
 
