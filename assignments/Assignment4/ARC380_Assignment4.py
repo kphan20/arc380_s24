@@ -75,7 +75,7 @@ class EETaskHandler:
     def move_to_point(self, dest: cg.Point, speed: float, quat: cg.Quaternion = None):
         """Helper function that handles conversion to world frame and command sending"""
 
-        dest.z = dest.z - 5
+        dest.z = dest.z - 0
 
         if quat is None:
             frame = cg.Frame(dest, [1, 0, 0], [0, -1, 0])
@@ -111,7 +111,7 @@ class EETaskHandler:
         cg.Point.transform_collection(corners, rotation)
 
         # move pen to corners and draw when appropriate
-        speed = 30
+        speed = 50
         self.move_to_point(self.lift_pen(corners[0]), speed)
 
         for corner in corners:
@@ -131,7 +131,7 @@ class EETaskHandler:
             #sampled_points.append(curve.point_at(i))
 
         # move pen to start and draw
-        speed = 30
+        speed = 50
         self.move_to_point(self.lift_pen(sampled_points[0]), speed)
 
         for point in sampled_points:
@@ -160,7 +160,7 @@ class EETaskHandler:
             jittered_points.append(line.point(intervs) + local_y * jitter)
 
         # move pen to start and draw
-        speed = 30
+        speed = 50
         self.move_to_point(self.lift_pen(jittered_points[0]), speed)
 
         for point in jittered_points:
@@ -208,7 +208,7 @@ class EETaskHandler:
         rotation = cg.Rotation.from_axis_and_angle(cg.Vector.Zaxis(), theta)
         translation = cg.Translation.from_vector([center.x, center.y, center.z])
 
-        speed = 30
+        speed = 50
         for hatch in hatches:
             rotated_hatch = cg.Point.transformed_collection(hatch, rotation)
             start_t, end_t = cg.Point.transformed_collection(rotated_hatch, translation)
@@ -217,6 +217,30 @@ class EETaskHandler:
             self.move_to_point(end_t, speed)
 
         self.move_to_point(self.lift_pen(end_t), speed)
+
+    # Draw a circle of any size given its radius and center point. (2c)
+    def draw_circle(self, radius: float, center: cg.Point):
+
+        # creates a list of points from the circle
+        points = []
+        for i in range(100):
+            angle = (
+                2 * np.pi * i / 100
+            )  # breaks up the circum of the circle into essentially 100 points
+            x = center[0] + radius * np.cos(angle)  # finding points along the radius
+            y = center[1] + radius * np.sin(angle)  # finding points along the radius
+            z = center[2]  # Circle is in the XY plane, so Z is constant
+            points.append(cg.Point(x, y, z))
+
+        # moving to the points & drawing
+        speed = 50
+        self.move_to_point(self.lift_pen(points[0]), speed)
+
+        for point in points:
+            self.move_to_point(point, speed)
+
+        self.move_to_point(points[0], speed)
+        self.move_to_point(self.lift_pen(points[0]), speed)
 
 
 # ========================================================================================
@@ -236,18 +260,22 @@ if __name__ == "__main__":
     abb_rrc.send(rrc.SetTool("group3"))
 
     # Parts 1.e. and 2
-    origin = cg.Point(163.27, 407.60, 30.92)
-    x_axis = cg.Point(163.27, 554.01, 31.41)
-    other_point = cg.Point(-26.05, 545.02, 30.88)
+    #origin = cg.Point(163.27, 407.60, 30.92) for 3xx
+    #x_axis = cg.Point(163.27, 554.01, 31.41) for 3xx
+    #other_point = cg.Point(-26.05, 545.02, 30.88) for 3xx
+    origin = cg.Point(167.21, 465.98, 27.64) # for 2xx
+    other_point = cg.Point(52.75, 465.98, 27.22) # for 2xx
+    x_axis = cg.Point(52.75, 563.31, 27.71) # for 2xx
     task_frame = create_frame_from_points(origin, x_axis, other_point)
     handler = EETaskHandler(abb_rrc, task_frame)
 
     handler.move_to_origin()
-    #handler.draw_rectangle(cg.Point(0, 0), 100, 100, math.pi / 4)
-    #curve_list = [cg.Point(0, 0), cg.Point(100, 50), cg.Point(150, 100)]
-    #handler.draw_curve(curve_list)
-    #handler.jitter_line(cg.Point(0, 0), cg.Point(-50, -50))
-    handler.draw_hatch()
+    handler.draw_rectangle(cg.Point(0, 0), 50, 50, math.pi / 4)
+    curve_list = [cg.Point(-25, -55), cg.Point(0, -70), cg.Point(25, -55)]
+    handler.draw_curve(curve_list)
+    handler.jitter_line(cg.Point(0, 25), cg.Point(0, -25))
+    handler.draw_hatch(cg.Point(0, 0), 50, 50, math.pi / 4)
+    handler.draw_circle(30, cg.Point(0, 0))
 
     # ====================================================================================
 
