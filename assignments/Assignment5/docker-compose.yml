@@ -1,0 +1,45 @@
+version: '2'
+services:
+  ros-core:
+    image: compasrrc/compas_rrc_driver:v1.1.0
+    container_name: ros-core
+    ports:
+      - "11311:11311"
+    command:
+      - roscore
+
+  ros-bridge:
+    image: compasrrc/compas_rrc_driver:v1.1.0
+    container_name: ros-bridge
+    environment:
+      - "ROS_HOSTNAME=ros-bridge"
+      - "ROS_MASTER_URI=http://ros-core:11311"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - ros-core
+    command:
+      - roslaunch
+      - --wait
+      - rosbridge_server
+      - rosbridge_websocket.launch
+
+  abb-driver-irb120:
+    image: compasrrc/compas_rrc_driver:v1.1.0
+    container_name: abb-driver-irb120
+    environment:
+      - ROS_HOSTNAME=abb-driver-irb120
+      - ROS_MASTER_URI=http://ros-core:11311
+    depends_on:
+      - ros-core
+    command:
+      - roslaunch
+      - --wait
+      - compas_rrc_driver
+      - bringup.launch
+      # Use 192.168.0.102 for IRB_286
+      # Use 192.168.0.103 for IRB_386
+      - robot_ip:=192.168.0.103
+      - robot_streaming_port:=30101
+      - robot_state_port:=30201
+      - namespace:=rob1-rw6
