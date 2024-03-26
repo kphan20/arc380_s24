@@ -57,8 +57,10 @@ def handle_transform(img, corners, ids):
     
 def process_image():
     """
-    Function that processes image and annotates with object features
+    Function that processes image, annotates it with object features, and returns the features
     """
+    
+    features = {}
     
     # get image and convert to cv2 image
     img = cv2.cvtColor(capture_img(), cv2.COLOR_BGR2RGB)
@@ -74,6 +76,8 @@ def process_image():
     
     # get corrected image
     img = handle_transform(img, corners, ids)
+    
+    return features
     
 
 if __name__ == "__main__":
