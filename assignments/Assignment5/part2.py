@@ -64,6 +64,38 @@ def handle_transform(img, corners, ids):
     return corrected_img
 
 
+# Defines broad BGR color ranges for each color
+bgr_color_ranges = {
+    "blue": ((90, 0, 0), (255, 120, 50)),  # BGR range for blue
+    "yellow": ((0, 180, 180), (80, 255, 255)),  # BGR range for yellow
+    "red": ((0, 0, 90), (80, 80, 255))  # BGR range for red
+}
+
+def match_color(bgr_color):
+    # Convert bgr_color to a numpy array
+    bgr_color_np = np.array(bgr_color)
+    
+    # Iterate through the predefined color ranges
+    for color_name, (lower, upper) in bgr_color_ranges.items():
+        lower_np = np.array(lower)
+        upper_np = np.array(upper)
+        
+        # Check if the detected color is within the current range
+        if np.all(lower_np <= bgr_color_np) and np.all(bgr_color_np <= upper_np):
+            return color_name
+    return "unknown"
+
+def detect_color(corrected_img, contour):
+    # Create mask where the white is what we want to keep
+    mask = np.zeros(corrected_img.shape[:2], dtype="uint8")
+    cv2.drawContours(mask, [contour], -1, 255, -1)
+    
+    # Compute the mean color of pixels within the area of the mask
+    mean_val = cv2.mean(corrected_img, mask=mask)
+    
+    # Returns the RGB values
+    return mean_val[:3]
+
 class Shape(enum.Enum):
     CIRCLE = 0
     SQUARE = 1
@@ -121,6 +153,8 @@ def process_image():
         shape_features = dict()
         shape_features["shape"] = detect_shape(contour)  # TODO tune threshold
         shape_features["pos"] = get_world_pos(contour)
+        bgr_color = detect_color(img, contour)
+        shape_features["color"] = match_color(bgr_color)
         features[shape_id] = shape_features
 
     return features
