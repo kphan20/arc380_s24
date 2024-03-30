@@ -1,6 +1,7 @@
 import compas_rrc as rrc
 import compas.geometry as cg
 from part2 import process_image
+from functools import cmp_to_key
 
 
 def create_frame_from_points(
@@ -119,11 +120,43 @@ class EETaskHandler:
         """
         Resets the robot and attempts to sort configuration
         """
+
+        # resets the robot to some home position
         speed = 30
         self.reset(speed)
-        self.abb_rrc.WaitTime()
+        self.abb_rrc.WaitTime(2)
 
+        def piece_comp(p1, p2):
+            """
+            Comparator function that should order pieces from largest to smallest
+            """
+
+            # if pieces are the same size, break tie with id
+            if p1["size"] == p2["size"]:
+                return p1["id"] - p2["id"]
+
+            # converts boolean to +-1
+            return (p1["size"] > p2["size"]) * -2 + 1
+
+        # extracts pieces by color and features of each individual piece
         pieces = process_image()
+
+        for color in pieces:
+            # sort each color of piece from largest to smallest
+            sorted_color_pieces = sorted(color, key=cmp_to_key(piece_comp))
+
+            # leave largest piece in place and sort on top of it
+            largest_piece = sorted_color_pieces.pop(0)
+            sorting_center = largest_piece["pos"]
+
+            for piece in sorted_color_pieces:
+                # TODO implement sorting
+                # 1. go to piece location while raised
+                # 2. lower to pick up piece
+                # 3. rotate if the object is a square
+                # 4. Move to largest piece while raised
+                # 5. drop piece
+                pass
 
 
 if __name__ == "__main__":

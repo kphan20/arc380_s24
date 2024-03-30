@@ -146,6 +146,14 @@ def process_image():
     aruco_detector = aruco.ArucoDetector(aruco_dict, aruco_params)
     corners, ids, _ = aruco_detector.detectMarkers(img)
 
+    # markers_img = img.copy()
+    # aruco.drawDetectedMarkers(markers_img, corners, ids)
+
+    # plt.figure(figsize=(16,9))
+    # plt.imshow(markers_img)
+    # plt.title('Detected ArUco markers')
+    # plt.show()
+
     # debug function to visualize Aruco markers
     # save_aruco_image(img, corners, ids)
 
@@ -214,22 +222,19 @@ def process_image():
         # plt.gca().invert_yaxis()
         # plt.show()
 
-    print(len(filtered))
-
     for contour_color in filtered:
-        print(match_color(detect_color(img, contour_color[0])))
-
-    # TODO find contours on masked image, rejecting aruco squares
-    # contours, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-
-    # for contour in contours:
-    #     shape_id = len(features.keys())
-    #     shape_features = dict()
-    #     shape_features["shape"] = detect_shape(contour)  # TODO tune threshold
-    #     shape_features["pos"] = get_world_pos(contour)
-    #     bgr_color = detect_color(img, contour)
-    #     shape_features["color"] = match_color(bgr_color)
-    #     features[shape_id] = shape_features
+        color = match_color(
+            detect_color(img, contour_color[0])
+        )  # TODO could add checks here to make sure all of the shapes fit the right color
+        color_list = list()
+        for idx, contour in enumerate(contours):
+            shape_features = dict()
+            shape_features["id"] = idx
+            shape_features["shape"] = detect_shape(contour)  # TODO tune threshold
+            shape_features["pos"] = get_world_pos(contour)
+            shape_features["color"] = color
+            color_list.append(shape_features)
+        features[color] = color_list
 
     return features
 
