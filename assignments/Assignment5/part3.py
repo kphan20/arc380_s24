@@ -96,6 +96,12 @@ class EETaskHandler:
         )
         print("Moved to point")
 
+    def move_to_world_point(self, dest: cg.Point, speed: float):
+        frame = cg.Frame(dest, [1, 0, 0], [0, -1, 0])
+        _ = self.abb_rrc.send_and_wait(
+            rrc.MoveToFrame(frame, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
+        )
+
     def move_to_origin(self):
         """Moves robot to task space origin"""
         self.move_to_point(self.lift_pen(cg.Point(0, 0)), 30)
@@ -141,9 +147,16 @@ class EETaskHandler:
         # extracts pieces by color and features of each individual piece
         pieces = process_image()
 
-        for color in pieces:
+        colors = dict()
+
+        for piece in pieces:
+            color_arr = colors.get(piece["color"], list())
+            color_arr.append(piece)
+            colors[piece["color"]] = color_arr
+
+        for color_pieces in colors.values():
             # sort each color of piece from largest to smallest
-            sorted_color_pieces = sorted(color, key=cmp_to_key(piece_comp))
+            sorted_color_pieces = sorted(color_pieces, key=cmp_to_key(piece_comp))
 
             # leave largest piece in place and sort on top of it
             largest_piece = sorted_color_pieces.pop(0)
@@ -152,6 +165,8 @@ class EETaskHandler:
             for piece in sorted_color_pieces:
                 # TODO implement sorting
                 # 1. go to piece location while raised
+                self.gripper_off()
+
                 # 2. lower to pick up piece
                 # 3. rotate if the object is a square
                 # 4. Move to largest piece while raised

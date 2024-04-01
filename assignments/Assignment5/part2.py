@@ -1,4 +1,4 @@
-from ARC380_Assignment5_helper import capture_img
+# from ARC380_Assignment5_helper import capture_img
 import cv2
 from cv2 import aruco
 import numpy as np
@@ -107,8 +107,9 @@ class Shape(enum.Enum):
 
 
 def detect_shape(contour, circle_threshold=0.8) -> Shape:
-    p = cv2.arcLength(contour, closed=True)
-    a = cv2.contourArea(contour)
+    smoothed = cv2.approxPolyDP(contour, 0.04 * cv2.arcLength(contour, True), True)
+    p = cv2.arcLength(smoothed, closed=True)
+    a = cv2.contourArea(smoothed)
     return Shape.CIRCLE if 4 * np.pi * a / p**2 > circle_threshold else Shape.SQUARE
 
 
@@ -128,12 +129,28 @@ def get_world_pos(contour, ppi=96):
     return x_mm, y_mm
 
 
+def get_center(contour):
+    moments = cv2.moments(contour)
+    u_c = int(moments["m10"] / moments["m00"])
+    v_c = int(moments["m01"] / moments["m00"])
+    return (u_c, v_c)
+
+
+def get_orientation(contour, shape):
+    # flip contour about y axis
+    # contour = cv2.flip(contour, 1)
+    if shape == Shape.CIRCLE:
+        return "circle"
+    else:
+        return 90 - cv2.minAreaRect(contour)[-1]
+
+
 def process_image():
     """
     Function that processes image, annotates it with object features, and returns the features
     """
 
-    features = {}
+    features = []
 
     # get image and convert to cv2 image
     img = cv2.cvtColor(
@@ -209,35 +226,96 @@ def process_image():
             contours = []
         else:
             filtered.append(contours)
+            # find average color of the region
+            # print(f"Mean color of region: {mean_val[:3]}")
 
         contour_img = img.copy()
-        cv2.drawContours(contour_img, contours, -1, (0, 255, 0), 3)
+        """ if len(contours) != 0:
+            #print(f"Number of filtered regions: {len(contours)}")
+            cv2.drawContours(contour_img, contours, -1, (0, 255, 0), 3)
 
-        plt.imshow(contour_img)
-        plt.title(f"Contour image for cluster {label}")
-        plt.gca().invert_yaxis()
-        plt.show()
+            plt.imshow(contour_img)
+            plt.title(f"Contour image for cluster {label}")
+            plt.gca().invert_yaxis()
+            plt.show() """
         # plt.imshow(mask_img, cmap="gray")
         # plt.title(f"Mask image for cluster {label} corresponding to dark green")
         # plt.gca().invert_yaxis()
         # plt.show()
+    # print length of filtered[0]
+    # print(f"Number of filtered regions: {len(filtered[0])}")
+    # print length of filtered[1]
+    # print(f"Number of filtered regions: {len(filtered[1])}")
+    # print length of filtered[2]
+    # print(f"Number of filtered regions: {len(filtered[2])}")
+    # print(f"Number of regions: {len(filtered)}")
 
-    for contour_color in filtered:
-        color = match_color(
-            detect_color(img, contour_color[0])
-        )  # TODO could add checks here to make sure all of the shapes fit the right color
-        color_list = list()
-        for idx, contour in enumerate(contours):
-            shape_features = dict()
-            shape_features["id"] = idx
-            shape_features["shape"] = detect_shape(contour)  # TODO tune threshold
-            shape_features["pos"] = get_world_pos(contour)
-            shape_features["color"] = color
-            color_list.append(shape_features)
-        features[color] = color_list
+    all_contours_img = img.copy()
+    # flip image about y axis
+    # all_contours_img = cv2.flip(all_contours_img, 1)
+    for i in range(len(filtered)):
+        mask = np.zeros(kmeans_img.shape[:2], dtype="uint8")
+        cv2.drawContours(mask, filtered[i], -1, 255, -1)
+        mean_val = cv2.mean(kmeans_img, mask=mask)
+        if mean_val[0] > 50:
+            color = "yellow"
+        elif mean_val[0] > 20 and mean_val[1] < 15:
+            color = "red"
+        else:
+            color = "blue"
+        for j in range(len(filtered[i])):
+            cv2.drawContours(all_contours_img, filtered[i], j, (0, 255, 0), 3)
+            cv2.circle(
+                all_contours_img, get_center(filtered[i][j]), 5, (255, 255, 0), -1
+            )
+            features.append(
+                {
+                    "shape": detect_shape(filtered[i][j]),
+                    "color": color,
+                    "size": cv2.contourArea(filtered[i][j]),
+                    "pos": get_world_pos(filtered[i][j]),
+                    "center": get_center(filtered[i][j]),
+                    "orientation": get_orientation(
+                        filtered[i][j], detect_shape(filtered[i][j])
+                    ),
+                }
+            )
+            # label each contour below center
+            cv2.putText(
+                all_contours_img,
+                f"{features[-1]['shape']} {features[-1]['size']} {round(features[-1]['pos'][0],2)} {round(features[-1]['pos'][1],2)}",
+                (
+                    get_center(filtered[i][j])[0] - 100,
+                    get_center(filtered[i][j])[1] - 50,
+                ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.4,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                all_contours_img,
+                f"{features[-1]['center']} {features[-1]['color']} {features[-1]['orientation']}",
+                (
+                    get_center(filtered[i][j])[0] - 100,
+                    get_center(filtered[i][j])[1] - 70,
+                ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.4,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
+
+    plt.imshow(all_contours_img)
+    plt.title("All contours in image")
+    # plt.gca().invert_yaxis()
+    plt.show()
 
     return features
 
 
 if __name__ == "__main__":
-    process_image()
+    feats = process_image()
+    print(feats)
