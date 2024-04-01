@@ -4,6 +4,7 @@ from cv2 import aruco
 import numpy as np
 import enum
 import matplotlib.pyplot as plt
+import compas.geometry as cg
 
 
 def save_aruco_image(img, corners, ids):
@@ -113,7 +114,7 @@ def detect_shape(contour, circle_threshold=0.8) -> Shape:
     return Shape.CIRCLE if 4 * np.pi * a / p**2 > circle_threshold else Shape.SQUARE
 
 
-def get_world_pos(contour, ppi=96):
+def get_world_pos(contour, ppi=96, width=10, height=7.5):
     moments = cv2.moments(contour)
     u_c = int(moments["m10"] / moments["m00"])
     v_c = int(moments["m01"] / moments["m00"])
@@ -126,7 +127,37 @@ def get_world_pos(contour, ppi=96):
     x_mm = x_in * 25.4
     y_mm = y_in * 25.4
 
-    return x_mm, y_mm
+    point1 = cg.Point(-338.98, 473.21, 203.97)  # 24.5
+    point2 = cg.Point(259.45, 451.31, 201.98)  # 25.5
+    point3 = cg.Point(248.3, 54.98, 200.75)  # 24.5
+    point4 = cg.Point(-230.38, 166.52, 24.5)  # tr
+    task_frame = cg.Frame.from_points(point1, point2, point3)
+    src_pts = np.array(
+        [[width * ppi, height * ppi], [0, height * ppi], [0, 0], [width * ppi, 0]],
+        dtype="float32",
+    )
+    dst_pts = np.array(
+        [
+            [point1.x, point1.y],
+            [point2.x, point2.y],
+            [point3.x, point3.y],
+            [point4.x, point4.y],
+        ],
+        dtype="float32",
+    )
+    print(x_mm, y_mm)
+    M = cv2.getPerspectiveTransform(src_pts, dst_pts)
+    # new_point = cv2.warpPerspective(
+    #     np.array([[[x_mm, y_mm]]], dtype=np.float32),
+    #     M,
+    # )
+    new_point = M @ np.array([[x_mm], [y_mm], [1]])
+    new_point = new_point.flatten()
+    new_point /= new_point[-1]
+    ee_frame_t = cg.Frame(cg.Point(new_point[0], new_point[1]), [1, 0, 0], [0, -1, 0])
+    ee_frame_w = task_frame.to_world_coordinates(ee_frame_t)
+
+    return ee_frame_w
 
 
 def get_center(contour):
