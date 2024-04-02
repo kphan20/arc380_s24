@@ -52,12 +52,9 @@ def transform_task_to_world_frame(
 
 
 class EETaskHandler:
-    def __init__(
-        self, abb_rrc: rrc.AbbClient, task_frame: cg.Frame, init_frame: cg.Frame
-    ) -> None:
+    def __init__(self, abb_rrc: rrc.AbbClient, task_frame: cg.Frame) -> None:
         self.abb_rrc = abb_rrc
         self.task_frame = task_frame
-        self.init_frame = init_frame  # Starting point in world frame
         self.is_gripper_on = False
         self.gripper_off()
 
@@ -67,9 +64,8 @@ class EETaskHandler:
         """
         if self.is_gripper_on:
             self.gripper_off()
-        _ = self.abb_rrc.send_and_wait(
-            rrc.MoveToFrame(self.init_frame, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
-        )
+        home = rrc.RobotJoints([0, 0, 0, 0, 90, 0])
+        _ = self.abb_rrc.send_and_wait(rrc.MoveToJoints(home, [], speed, rrc.Zone.FINE))
 
     def lift_pen(self, dest: cg.Point):
         """Helper function that lifts pen
@@ -197,9 +193,9 @@ if __name__ == "__main__":
 
         # ================================== YOUR CODE HERE ==================================
         abb_rrc.send(rrc.SetTool("vac_gripper"))
-        origin = cg.Point(167.21, 465.98, 27.64)  # for 2xx
-        other_point = cg.Point(52.75, 465.98, 27.22)  # for 2xx
-        x_axis = cg.Point(52.75, 563.31, 27.71)  # for 2xx
+        x_axis = cg.Point(-236.99, 498.73, 21.31)  # 24.5
+        origin = cg.Point(241.78, 485.88, 21.1)  # 25.5
+        other_point = cg.Point(235.89, 193.29, 21.34)
         task_frame = create_frame_from_points(origin, x_axis, other_point)
         handler = EETaskHandler(abb_rrc, task_frame)
         handler.sort_pieces()
