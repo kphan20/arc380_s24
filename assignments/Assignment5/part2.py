@@ -6,6 +6,11 @@ import enum
 import matplotlib.pyplot as plt
 import compas.geometry as cg
 
+# Dimensions from inner corner to inner corner
+width = 18 + 15 / 16  # 22.8125  # 10
+height = 11.75  # 15.75  # 7.5
+ppi = 32
+
 
 def save_aruco_image(img, corners, ids):
     """
@@ -21,11 +26,11 @@ def handle_transform(img, corners, ids):
     """
     Takes image and aruco info to transform image into task frame
     """
-
+    global width, height, ppi
     # Define the dimensions of the output image
-    width = 10  # inches
-    height = 7.5  # inches
-    ppi = 96  # pixels per inch (standard resolution for most screens - can be any arbitrary value that still preserves information)
+    # width = 22.8125  # 10  # 22.8125  # inches
+    # height = 15.75  # 7.5  # 15.75  # inches
+    # ppi = 32  # pixels per inch (standard resolution for most screens - can be any arbitrary value that still preserves information)
 
     # Sort corners based on id
     ids = ids.flatten()
@@ -41,12 +46,16 @@ def handle_transform(img, corners, ids):
 
     # Extract source points corresponding to the exterior bounding box corners of the 4 markers
     src_pts = np.array(
-        [corners[0][0], corners[1][1], corners[2][2], corners[3][3]], dtype="float32"
+        [corners[0][1], corners[1][2], corners[2][3], corners[3][0]], dtype="float32"
     )
 
     # Define destination points as the corners of the output image
+    # dst_pts = np.array(
+    #     [[width * ppi, 0], [width * ppi, height * ppi], [0, height * ppi], [0, 0]],
+    #     dtype="float32",
+    # )
     dst_pts = np.array(
-        [[width * ppi, 0], [width * ppi, height * ppi], [0, height * ppi], [0, 0]],
+        [[0, 0], [0, height * ppi], [width * ppi, height * ppi], [width * ppi, 0]],
         dtype="float32",
     )
 
@@ -118,7 +127,8 @@ def detect_shape(contour, circle_threshold=0.8) -> Shape:
     )
 
 
-def get_world_pos(contour, ppi=96, width=10, height=7.5):
+def get_world_pos(contour):
+    global ppi
     moments = cv2.moments(contour)
     u_c = int(moments["m10"] / moments["m00"])
     v_c = int(moments["m01"] / moments["m00"])
@@ -131,34 +141,13 @@ def get_world_pos(contour, ppi=96, width=10, height=7.5):
     x_mm = x_in * 25.4
     y_mm = y_in * 25.4
 
-    point1 = cg.Point(-338.98, 473.21, 203.97)  # 24.5
-    point2 = cg.Point(259.45, 451.31, 201.98)  # 25.5
-    point3 = cg.Point(248.3, 54.98, 200.75)  # 24.5
-    point4 = cg.Point(-230.38, 166.52, 24.5)  # tr
-    task_frame = cg.Frame.from_points(point1, point2, point3)
-    src_pts = np.array(
-        [[width * ppi, height * ppi], [0, height * ppi], [0, 0], [width * ppi, 0]],
-        dtype="float32",
-    )
-    dst_pts = np.array(
-        [
-            [point1.x, point1.y],
-            [point2.x, point2.y],
-            [point3.x, point3.y],
-            [point4.x, point4.y],
-        ],
-        dtype="float32",
-    )
-    print(x_mm, y_mm)
-    M = cv2.getPerspectiveTransform(src_pts, dst_pts)
-    # new_point = cv2.warpPerspective(
-    #     np.array([[[x_mm, y_mm]]], dtype=np.float32),
-    #     M,
-    # )
-    new_point = M @ np.array([[x_mm], [y_mm], [1]])
-    new_point = new_point.flatten()
-    new_point /= new_point[-1]
-    ee_frame_t = cg.Frame(cg.Point(new_point[0], new_point[1]), [1, 0, 0], [0, -1, 0])
+    point1 = cg.Point(-236.99, 498.73, 21.31)  # 24.5
+    point2 = cg.Point(241.78, 485.88, 21.1)  # 25.5
+    point3 = cg.Point(235.89, 193.29, 21.34)  # 24.5
+    point4 = cg.Point(-230.38, 166.52, 200.5)  # tr
+    task_frame = cg.Frame.from_points(point2, point1, point3)
+
+    ee_frame_t = cg.Frame(cg.Point(x_mm, y_mm), [1, 0, 0], [0, 1, 0])
     ee_frame_w = task_frame.to_world_coordinates(ee_frame_t)
 
     return ee_frame_w
@@ -279,10 +268,20 @@ def process_image():
         contours = [
             contours[i]
             for i in range(len(contours))
-            if areas[i] > 4000 and areas[i] < 20000
+            if areas[i] > 2000 and areas[i] < 20000
         ]
         areas = [cv2.contourArea(contour) for contour in contours]
         print(f"Area of each region: {areas}")
+
+        contour_img = img.copy()
+        if len(contours) != 0:
+            # print(f"Number of filtered regions: {len(contours)}")
+            cv2.drawContours(contour_img, contours, -1, (0, 255, 0), 3)
+
+            plt.imshow(contour_img)
+            plt.title(f"Contour image for cluster {label}")
+            plt.gca().invert_yaxis()
+            plt.show()
 
         if len(contours) < 3 or len(contours) > 4:
             contours = []

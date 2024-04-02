@@ -1,6 +1,6 @@
 import compas_rrc as rrc
 import compas.geometry as cg
-from part2 import process_image
+from part2 import process_image, Shape
 from functools import cmp_to_key
 
 
@@ -96,10 +96,9 @@ class EETaskHandler:
         )
         print("Moved to point")
 
-    def move_to_world_point(self, dest: cg.Point, speed: float):
-        frame = cg.Frame(dest, [1, 0, 0], [0, -1, 0])
+    def move_to_world_point(self, dest: cg.Frame, speed: float):
         _ = self.abb_rrc.send_and_wait(
-            rrc.MoveToFrame(frame, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
+            rrc.MoveToFrame(dest, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
         )
 
     def move_to_origin(self):
@@ -110,17 +109,19 @@ class EETaskHandler:
         """
         Turns gripper on and waits
         """
-        self.is_gripper_on = True
-        self.abb_rrc.SetDigital("DO00", 1)
-        self.abb_rrc.WaitTime(2)  # TODO see if these are the right settings to wait
+        if not self.is_gripper_on:
+            self.is_gripper_on = True
+            self.abb_rrc.SetDigital("DO00", 1)
+            self.abb_rrc.WaitTime(2)  # TODO see if these are the right settings to wait
 
     def gripper_off(self):
         """
         Turns gripper off and waits
         """
-        self.is_gripper_on = False
-        self.abb_rrc.SetDigital("DO00", 0)
-        self.abb_rrc.WaitTime(2)
+        if self.is_gripper_on:
+            self.is_gripper_on = False
+            self.abb_rrc.SetDigital("DO00", 0)
+            self.abb_rrc.WaitTime(2)
 
     def sort_pieces(self):
         """
@@ -166,12 +167,22 @@ class EETaskHandler:
                 # TODO implement sorting
                 # 1. go to piece location while raised
                 self.gripper_off()
+                self.move_to_world_point(piece["pos"], speed)  # TODO raise frame
 
                 # 2. lower to pick up piece
+                self.move_to_world_point(piece["pos"], speed)
+                self.gripper_on()
+
                 # 3. rotate if the object is a square
+                if piece["shape"] == Shape.SQUARE:
+                    pass  # TODO implement rotate method
+
                 # 4. Move to largest piece while raised
+                self.move_to_world_point(sorting_center, speed)  # TODO raise frame
+
                 # 5. drop piece
-                pass
+                self.move_to_world_point(sorting_center, speed)
+                self.gripper_off()
 
 
 if __name__ == "__main__":
