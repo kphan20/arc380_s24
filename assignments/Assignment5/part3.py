@@ -67,9 +67,9 @@ class EETaskHandler:
         """
         if self.is_gripper_on:
             self.gripper_off()
-        _ = self.abb_rrc.send_and_wait(
-            rrc.MoveToFrame(self.init_frame, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
-        )
+
+        home = rrc.RobotJoints([0, 0, 0, 0, 90, 0])
+        _ = self.abb_rrc.send_and_wait(rrc.MoveToJoints(home, [], speed, rrc.Zone.FINE))
 
     def lift_pen(self, dest: cg.Point):
         """Helper function that lifts pen
@@ -77,6 +77,16 @@ class EETaskHandler:
 
         return cg.Point(
             dest.x, dest.y, dest.z + 5
+        )  # TODO test values for lift, when to call this function
+    
+    def lift_frame(self, frame: cg.Frame, lifted_height=25):
+        """Helper function that lifts pen
+        when we want to move the pen but not draw"""
+        #lifted_height = 25
+        lifted_point = cg.Point(frame.point.x, frame.point.y, frame.point.z + lifted_height)
+
+        return cg.Frame(
+            lifted_point, frame.xaxis, frame.yaxis
         )  # TODO test values for lift, when to call this function
 
     def move_to_point(self, dest: cg.Point, speed: float, quat: cg.Quaternion = None):
@@ -96,7 +106,7 @@ class EETaskHandler:
         )
         print("Moved to point")
 
-    def move_to_world_point(self, dest: cg.Frame, speed: float):
+    def move_to_world_frame(self, dest: cg.Frame, speed: float):
         _ = self.abb_rrc.send_and_wait(
             rrc.MoveToFrame(dest, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
         )
@@ -112,7 +122,7 @@ class EETaskHandler:
         if not self.is_gripper_on:
             self.is_gripper_on = True
             self.abb_rrc.SetDigital("DO00", 1)
-            self.abb_rrc.WaitTime(2)  # TODO see if these are the right settings to wait
+            self.abb_rrc.send_and_wait(rrc.WaitTime(2))  # TODO see if these are the right settings to wait
 
     def gripper_off(self):
         """
@@ -121,7 +131,7 @@ class EETaskHandler:
         if self.is_gripper_on:
             self.is_gripper_on = False
             self.abb_rrc.SetDigital("DO00", 0)
-            self.abb_rrc.WaitTime(2)
+            self.abb_rrc.send_and_wait(rrc.WaitTime(2))
 
     def sort_pieces(self):
         """
@@ -131,7 +141,7 @@ class EETaskHandler:
         # resets the robot to some home position
         speed = 30
         self.reset(speed)
-        self.abb_rrc.WaitTime(2)
+        self.abb_rrc.send_and_wait(rrc.WaitTime(2))
 
         def piece_comp(p1, p2):
             """
@@ -147,6 +157,9 @@ class EETaskHandler:
 
         # extracts pieces by color and features of each individual piece
         pieces = process_image()
+
+        intermediate = rrc.RobotJoints([45, 0, 0, 0, 90, 0])
+        _ = self.abb_rrc.send_and_wait(rrc.MoveToJoints(intermediate, [], speed, rrc.Zone.FINE))
 
         colors = dict()
 
@@ -167,21 +180,26 @@ class EETaskHandler:
                 # TODO implement sorting
                 # 1. go to piece location while raised
                 self.gripper_off()
-                self.move_to_world_point(piece["pos"], speed)  # TODO raise frame
+                # self.abb_rrc.send_and_wait(rrc.WaitTime(2))
+                raised_frame = self.lift_frame(piece["pos"])
+                self.move_to_world_frame(raised_frame, speed)  # TODO raise frame
+
 
                 # 2. lower to pick up piece
-                self.move_to_world_point(piece["pos"], speed)
+                self.move_to_world_frame(piece["pos"], speed)
                 self.gripper_on()
 
                 # 3. rotate if the object is a square
                 if piece["shape"] == Shape.SQUARE:
+                    robot_joints, _ = self.abb_rrc.send_and_wait(rrc.GetJoints())
+                    _ = self.abb_rrc.send_and_wait(rrc.MoveToJoints(robot_joints, [], speed, rrc.Zone.FINE))
                     pass  # TODO implement rotate method
 
                 # 4. Move to largest piece while raised
-                self.move_to_world_point(sorting_center, speed)  # TODO raise frame
+                self.move_to_world_frame(self.lift_frame(sorting_center), speed)  # TODO raise frame
 
                 # 5. drop piece
-                self.move_to_world_point(sorting_center, speed)
+                self.move_to_world_frame(sorting_center, speed)
                 self.gripper_off()
 
 
