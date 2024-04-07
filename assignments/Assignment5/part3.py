@@ -72,7 +72,7 @@ class EETaskHandler:
         when we want to move the pen but not draw"""
 
         return cg.Point(
-            dest.x, dest.y, dest.z + 5
+            dest.x, dest.y, dest.z + 10
         )  # TODO test values for lift, when to call this function
 
     def move_to_point(self, dest: cg.Point, speed: float, quat: cg.Quaternion = None):
@@ -93,8 +93,9 @@ class EETaskHandler:
         print("Moved to point")
 
     def move_to_world_point(self, dest: cg.Frame, speed: float):
+        frame = cg.Frame(dest, [1, 0, 0], [0, 1, 0])
         _ = self.abb_rrc.send_and_wait(
-            rrc.MoveToFrame(dest, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
+            rrc.MoveToFrame(frame, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
         )
 
     def move_to_origin(self):
@@ -119,15 +120,17 @@ class EETaskHandler:
             self.abb_rrc.SetDigital("DO00", 0)
             self.abb_rrc.WaitTime(2)
 
-    def sort_pieces(self):
+    def sort_pieces(self, pieces):
         """
         Resets the robot and attempts to sort configuration
         """
 
         # resets the robot to some home position
         speed = 30
-        self.reset(speed)
-        self.abb_rrc.WaitTime(2)
+        #self.reset(speed)
+        #self.abb_rrc.WaitTime(2)
+
+        #rotate joint 1 (base) to ~ 90 degrees
 
         def piece_comp(p1, p2):
             """
@@ -142,7 +145,8 @@ class EETaskHandler:
             return (p1["size"] > p2["size"]) * -2 + 1
 
         # extracts pieces by color and features of each individual piece
-        pieces = process_image()
+        #pieces = process_image()
+        print(pieces)
 
         colors = dict()
 
@@ -163,10 +167,11 @@ class EETaskHandler:
                 # TODO implement sorting
                 # 1. go to piece location while raised
                 self.gripper_off()
-                self.move_to_world_point(piece["pos"], speed)  # TODO raise frame
+                print(piece["pos"].point)
+                self.move_to_world_point(self.lift_pen(piece["pos"].point), speed)  # TODO raise frame
 
                 # 2. lower to pick up piece
-                self.move_to_world_point(piece["pos"], speed)
+                self.move_to_world_point(self.lift_pen(piece["pos"].point), speed)
                 self.gripper_on()
 
                 # 3. rotate if the object is a square
@@ -174,10 +179,10 @@ class EETaskHandler:
                     pass  # TODO implement rotate method
 
                 # 4. Move to largest piece while raised
-                self.move_to_world_point(sorting_center, speed)  # TODO raise frame
+                self.move_to_world_point(self.lift_pen(sorting_center.point), speed)  # TODO raise frame
 
                 # 5. drop piece
-                self.move_to_world_point(sorting_center, speed)
+                self.move_to_world_point(self.lift_pen(sorting_center.point), speed)
                 self.gripper_off()
 
 
@@ -198,7 +203,10 @@ if __name__ == "__main__":
         other_point = cg.Point(235.89, 193.29, 21.34)
         task_frame = create_frame_from_points(origin, x_axis, other_point)
         handler = EETaskHandler(abb_rrc, task_frame)
-        handler.sort_pieces()
+        pieces = process_image()
+        handler.move_to_origin()
+        #handler.reset(30)
+        handler.sort_pieces(pieces)
     finally:
         # Close client
         ros.close()
