@@ -74,43 +74,6 @@ def handle_transform(img, corners, ids):
 
     return corrected_img
 
-
-""" # Defines broad BGR color ranges for each color
-bgr_color_ranges = {
-    "blue": ((90, 0, 0), (255, 120, 50)),  # BGR range for blue
-    "yellow": ((0, 180, 180), (80, 255, 255)),  # BGR range for yellow
-    "red": ((0, 0, 90), (80, 80, 255)),  # BGR range for red
-} """
-
-
-""" def match_color(bgr_color):
-    # Convert bgr_color to a numpy array
-    bgr_color_np = np.array(bgr_color)
-    print(bgr_color_np)
-
-    # Iterate through the predefined color ranges
-    for color_name, (lower, upper) in bgr_color_ranges.items():
-        lower_np = np.array(lower)
-        upper_np = np.array(upper)
-
-        # Check if the detected color is within the current range
-        if np.all(lower_np <= bgr_color_np) and np.all(bgr_color_np <= upper_np):
-            return color_name
-    return "unknown" """
-
-
-""" def detect_color(corrected_img, contour):
-    # Create mask where the white is what we want to keep
-    mask = np.zeros(corrected_img.shape[:2], dtype="uint8")
-    cv2.drawContours(mask, [contour], -1, 255, -1)
-
-    # Compute the mean color of pixels within the area of the mask
-    mean_val = cv2.mean(corrected_img, mask=mask)
-
-    # Returns the RGB values
-    return mean_val[:3] """
-
-
 class Shape(enum.Enum):
     CIRCLE = 0
     SQUARE = 1
@@ -149,6 +112,7 @@ def get_world_pos(contour):
 
     ee_frame_t = cg.Frame(cg.Point(x_mm, y_mm), [1, 0, 0], [0, 1, 0])
     ee_frame_w = task_frame.to_world_coordinates(ee_frame_t)
+    ee_frame_w.point.x += 5
 
     return ee_frame_w
 
@@ -203,7 +167,7 @@ def process_image():
     features = []
 
     # snap image from camera 0 and save
-    # capture_and_save_image("raw_img.png")
+    capture_and_save_image("raw_img.png")
 
     # get image and convert to cv2 image
     img = cv2.cvtColor(cv2.imread("raw_img.png"), cv2.COLOR_BGR2RGB)
@@ -236,7 +200,7 @@ def process_image():
     img_data = np.float32(img_data)
 
     # Define the number of clusters
-    k = 6
+    k = 5
 
     # Define the criteria for the k-means algorithm
     # This is a tuple with three elements: (type of termination criteria, maximum number of iterations, epsilon/required accuracy)
@@ -274,42 +238,26 @@ def process_image():
         print(f"Area of each region: {areas}")
 
         contour_img = img.copy()
-        if len(contours) != 0:
+        #if len(contours) != 0:
             # print(f"Number of filtered regions: {len(contours)}")
-            cv2.drawContours(contour_img, contours, -1, (0, 255, 0), 3)
+            # print color of region
+            #mean_val = cv2.mean(kmeans_img, mask=mask_img)
+            #print(f"Mean color of region: {mean_val[:3]}")
+            #cv2.drawContours(contour_img, contours, -1, (0, 255, 0), 3)
 
-            plt.imshow(contour_img)
-            plt.title(f"Contour image for cluster {label}")
-            plt.gca().invert_yaxis()
-            plt.show()
+            #plt.imshow(contour_img)
+            #plt.title(f"Contour image for cluster {label}")
+            #plt.gca().invert_yaxis()
+            #plt.show()
 
-        if len(contours) < 3 or len(contours) > 4:
-            contours = []
-        else:
-            filtered.append(contours)
+        #if len(contours) < 3 or len(contours) > 4:
+            #contours = []
+        #else:
+        filtered.append(contours)
             # find average color of the region
             # print(f"Mean color of region: {mean_val[:3]}")
 
         contour_img = img.copy()
-        """ if len(contours) != 0:
-            #print(f"Number of filtered regions: {len(contours)}")
-            cv2.drawContours(contour_img, contours, -1, (0, 255, 0), 3)
-
-            plt.imshow(contour_img)
-            plt.title(f"Contour image for cluster {label}")
-            plt.gca().invert_yaxis()
-            plt.show() """
-        # plt.imshow(mask_img, cmap="gray")
-        # plt.title(f"Mask image for cluster {label} corresponding to dark green")
-        # plt.gca().invert_yaxis()
-        # plt.show()
-    # print length of filtered[0]
-    # print(f"Number of filtered regions: {len(filtered[0])}")
-    # print length of filtered[1]
-    # print(f"Number of filtered regions: {len(filtered[1])}")
-    # print length of filtered[2]
-    # print(f"Number of filtered regions: {len(filtered[2])}")
-    # print(f"Number of regions: {len(filtered)}")
 
     all_contours_img = img.copy()
     # flip image about y axis
@@ -318,9 +266,10 @@ def process_image():
         mask = np.zeros(kmeans_img.shape[:2], dtype="uint8")
         cv2.drawContours(mask, filtered[i], -1, 255, -1)
         mean_val = cv2.mean(kmeans_img, mask=mask)
-        if mean_val[0] > 50:
+        #print(f"Mean color of region: {mean_val[:3]}")
+        if mean_val[0] > 110:
             color = "yellow"
-        elif mean_val[0] > 20 and mean_val[1] < 15:
+        elif mean_val[0] > 50 and mean_val[1] < 50:
             color = "red"
         else:
             color = "blue"
@@ -382,14 +331,14 @@ def process_image():
                 cv2.LINE_AA,
             )
 
-    plt.imshow(all_contours_img)
-    plt.title("All contours in image")
+    #plt.imshow(all_contours_img)
+    #plt.title("All contours in image")
     # plt.gca().invert_yaxis()
-    plt.show()
+    #plt.show()
 
     return features
 
 
 if __name__ == "__main__":
     feats = process_image()
-    print(feats)
+    #print(feats)

@@ -52,12 +52,9 @@ def transform_task_to_world_frame(
 
 
 class EETaskHandler:
-    def __init__(
-        self, abb_rrc: rrc.AbbClient, task_frame: cg.Frame, init_frame: cg.Frame
-    ) -> None:
+    def __init__(self, abb_rrc: rrc.AbbClient, task_frame: cg.Frame) -> None:
         self.abb_rrc = abb_rrc
         self.task_frame = task_frame
-        self.init_frame = init_frame  # Starting point in world frame
         self.is_gripper_on = False
         self.gripper_off()
 
@@ -68,7 +65,7 @@ class EETaskHandler:
         if self.is_gripper_on:
             self.gripper_off()
 
-        home = rrc.RobotJoints([0, 0, 0, 0, 90, 0])
+        home = rrc.RobotJoints([0, 0, 0, 0, 90, 320])
         _ = self.abb_rrc.send_and_wait(rrc.MoveToJoints(home, [], speed, rrc.Zone.FINE))
 
     def lift_pen(self, dest: cg.Point):
@@ -76,10 +73,10 @@ class EETaskHandler:
         when we want to move the pen but not draw"""
 
         return cg.Point(
-            dest.x, dest.y, dest.z + 5
+            dest.x, dest.y, dest.z + 10
         )  # TODO test values for lift, when to call this function
     
-    def lift_frame(self, frame: cg.Frame, lifted_height=25):
+    def lift_frame(self, frame: cg.Frame, lifted_height=40):
         """Helper function that lifts pen
         when we want to move the pen but not draw"""
         #lifted_height = 25
@@ -107,8 +104,11 @@ class EETaskHandler:
         print("Moved to point")
 
     def move_to_world_frame(self, dest: cg.Frame, speed: float):
+        frame = cg.Frame(dest.point, [1, 0, 0], [0, -1, 0])
+        # print frame
+        print(frame)
         _ = self.abb_rrc.send_and_wait(
-            rrc.MoveToFrame(dest, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
+            rrc.MoveToFrame(frame, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
         )
 
     def move_to_origin(self):
@@ -121,7 +121,7 @@ class EETaskHandler:
         """
         if not self.is_gripper_on:
             self.is_gripper_on = True
-            self.abb_rrc.SetDigital("DO00", 1)
+            self.abb_rrc.send_and_wait(rrc.SetDigital("DO00", 1))
             self.abb_rrc.send_and_wait(rrc.WaitTime(2))  # TODO see if these are the right settings to wait
 
     def gripper_off(self):
@@ -130,7 +130,7 @@ class EETaskHandler:
         """
         if self.is_gripper_on:
             self.is_gripper_on = False
-            self.abb_rrc.SetDigital("DO00", 0)
+            self.abb_rrc.send_and_wait(rrc.SetDigital("DO00", 0))
             self.abb_rrc.send_and_wait(rrc.WaitTime(2))
 
     def sort_pieces(self):
@@ -139,7 +139,7 @@ class EETaskHandler:
         """
 
         # resets the robot to some home position
-        speed = 30
+        speed = 100
         self.reset(speed)
         self.abb_rrc.send_and_wait(rrc.WaitTime(2))
 
@@ -158,8 +158,11 @@ class EETaskHandler:
         # extracts pieces by color and features of each individual piece
         pieces = process_image()
 
-        intermediate = rrc.RobotJoints([45, 0, 0, 0, 90, 0])
+        intermediate = rrc.RobotJoints([60, 0, 0, 0, 90, 320])
         _ = self.abb_rrc.send_and_wait(rrc.MoveToJoints(intermediate, [], speed, rrc.Zone.FINE))
+
+        intermediate2 = rrc.RobotJoints([60, 0, 23, 0, 63, 320])
+        _ = self.abb_rrc.send_and_wait(rrc.MoveToJoints(intermediate2, [], speed, rrc.Zone.FINE))
 
         colors = dict()
 
@@ -176,7 +179,9 @@ class EETaskHandler:
             largest_piece = sorted_color_pieces.pop(0)
             sorting_center = largest_piece["pos"]
 
-            for piece in sorted_color_pieces:
+            for idx, piece in enumerate(sorted_color_pieces):
+                #print(piece["pos"])
+                #print(piece["pos"].point)
                 # TODO implement sorting
                 # 1. go to piece location while raised
                 self.gripper_off()
@@ -186,7 +191,7 @@ class EETaskHandler:
 
 
                 # 2. lower to pick up piece
-                self.move_to_world_frame(piece["pos"], speed)
+                self.move_to_world_frame(self.lift_frame(piece["pos"], 3), speed)
                 self.gripper_on()
 
                 # 3. rotate if the object is a square
@@ -199,8 +204,9 @@ class EETaskHandler:
                 self.move_to_world_frame(self.lift_frame(sorting_center), speed)  # TODO raise frame
 
                 # 5. drop piece
-                self.move_to_world_frame(sorting_center, speed)
+                self.move_to_world_frame(self.lift_frame(sorting_center, 6*(idx+1)), speed)
                 self.gripper_off()
+                self.move_to_world_frame(self.lift_frame(sorting_center, 6*(idx+2)), speed)
 
 
 if __name__ == "__main__":
@@ -215,11 +221,14 @@ if __name__ == "__main__":
 
         # ================================== YOUR CODE HERE ==================================
         abb_rrc.send(rrc.SetTool("vac_gripper"))
-        origin = cg.Point(167.21, 465.98, 27.64)  # for 2xx
-        other_point = cg.Point(52.75, 465.98, 27.22)  # for 2xx
-        x_axis = cg.Point(52.75, 563.31, 27.71)  # for 2xx
+        x_axis = cg.Point(-236.99, 498.73, 21.31)  # 24.5
+        origin = cg.Point(241.78, 485.88, 21.1)  # 25.5
+        other_point = cg.Point(235.89, 193.29, 21.34)
         task_frame = create_frame_from_points(origin, x_axis, other_point)
         handler = EETaskHandler(abb_rrc, task_frame)
+        #pieces = process_image()
+        #handler.move_to_origin()
+        #handler.reset(30)
         handler.sort_pieces()
     finally:
         # Close client
