@@ -27,10 +27,6 @@ def handle_transform(img, corners, ids):
     Takes image and aruco info to transform image into task frame
     """
     global width, height, ppi
-    # Define the dimensions of the output image
-    # width = 22.8125  # 10  # 22.8125  # inches
-    # height = 15.75  # 7.5  # 15.75  # inches
-    # ppi = 32  # pixels per inch (standard resolution for most screens - can be any arbitrary value that still preserves information)
 
     # Sort corners based on id
     ids = ids.flatten()
@@ -50,10 +46,6 @@ def handle_transform(img, corners, ids):
     )
 
     # Define destination points as the corners of the output image
-    # dst_pts = np.array(
-    #     [[width * ppi, 0], [width * ppi, height * ppi], [0, height * ppi], [0, 0]],
-    #     dtype="float32",
-    # )
     dst_pts = np.array(
         [[0, 0], [0, height * ppi], [width * ppi, height * ppi], [width * ppi, 0]],
         dtype="float32",
@@ -62,7 +54,6 @@ def handle_transform(img, corners, ids):
     # Compute the perspective transformation matrix
     M = cv2.getPerspectiveTransform(src_pts, dst_pts)
 
-    # TODO see if BGR image is necessary
     # Apply the perspective transformation to the input image
     corrected_img = cv2.warpPerspective(img, M, (1920, 1080))
 
@@ -73,6 +64,7 @@ def handle_transform(img, corners, ids):
     # cv2.imwrite("warped.png", corrected_img)
 
     return corrected_img
+
 
 class Shape(enum.Enum):
     CIRCLE = 0
@@ -159,15 +151,16 @@ def capture_and_save_image(file_name):
     print("Image captured and saved as", file_name)
 
 
-def process_image():
+def process_image(capture_image=True, debug=False):
     """
     Function that processes image, annotates it with object features, and returns the features
     """
 
     features = []
 
-    # snap image from camera 0 and save
-    capture_and_save_image("raw_img.png")
+    if capture_image:
+        # snap image from camera and save
+        capture_and_save_image("raw_img.png")
 
     # get image and convert to cv2 image
     img = cv2.cvtColor(cv2.imread("raw_img.png"), cv2.COLOR_BGR2RGB)
@@ -178,16 +171,14 @@ def process_image():
     aruco_detector = aruco.ArucoDetector(aruco_dict, aruco_params)
     corners, ids, _ = aruco_detector.detectMarkers(img)
 
-    # markers_img = img.copy()
-    # aruco.drawDetectedMarkers(markers_img, corners, ids)
+    if debug:
+        markers_img = img.copy()
+        aruco.drawDetectedMarkers(markers_img, corners, ids)
 
-    # plt.figure(figsize=(16,9))
-    # plt.imshow(markers_img)
-    # plt.title('Detected ArUco markers')
-    # plt.show()
-
-    # debug function to visualize Aruco markers
-    # save_aruco_image(img, corners, ids)
+        plt.figure(figsize=(16, 9))
+        plt.imshow(markers_img)
+        plt.title("Detected ArUco markers")
+        plt.show()
 
     # get corrected image
     img = handle_transform(img, corners, ids)
@@ -237,36 +228,34 @@ def process_image():
         areas = [cv2.contourArea(contour) for contour in contours]
         print(f"Area of each region: {areas}")
 
-        contour_img = img.copy()
-        #if len(contours) != 0:
-            # print(f"Number of filtered regions: {len(contours)}")
-            # print color of region
-            #mean_val = cv2.mean(kmeans_img, mask=mask_img)
-            #print(f"Mean color of region: {mean_val[:3]}")
-            #cv2.drawContours(contour_img, contours, -1, (0, 255, 0), 3)
+        if debug:
+            contour_img = img.copy()
+            if len(contours) != 0:
+                print(f"Number of filtered regions: {len(contours)}")
+                # print color of region
+                mean_val = cv2.mean(kmeans_img, mask=mask_img)
+                print(f"Mean color of region: {mean_val[:3]}")
+                cv2.drawContours(contour_img, contours, -1, (0, 255, 0), 3)
 
-            #plt.imshow(contour_img)
-            #plt.title(f"Contour image for cluster {label}")
-            #plt.gca().invert_yaxis()
-            #plt.show()
+                plt.imshow(contour_img)
+                plt.title(f"Contour image for cluster {label}")
+                plt.gca().invert_yaxis()
+                plt.show()
 
-        #if len(contours) < 3 or len(contours) > 4:
-            #contours = []
-        #else:
-        filtered.append(contours)
+        if len(contours) < 3 or len(contours) > 4:
+            contours = []
+        else:
+            filtered.append(contours)
             # find average color of the region
             # print(f"Mean color of region: {mean_val[:3]}")
 
-        contour_img = img.copy()
-
     all_contours_img = img.copy()
-    # flip image about y axis
-    # all_contours_img = cv2.flip(all_contours_img, 1)
+
     for i in range(len(filtered)):
         mask = np.zeros(kmeans_img.shape[:2], dtype="uint8")
         cv2.drawContours(mask, filtered[i], -1, 255, -1)
         mean_val = cv2.mean(kmeans_img, mask=mask)
-        #print(f"Mean color of region: {mean_val[:3]}")
+        # print(f"Mean color of region: {mean_val[:3]}")
         if mean_val[0] > 110:
             color = "yellow"
         elif mean_val[0] > 50 and mean_val[1] < 50:
@@ -295,8 +284,8 @@ def process_image():
                 all_contours_img,
                 f"Shape: {features[-1]['shape']} Size: {features[-1]['size']}",
                 (
-                    get_center(filtered[i][j])[0] - 100,
-                    get_center(filtered[i][j])[1] - 50,
+                    get_center(filtered[i][j])[0] - 60,
+                    get_center(filtered[i][j])[1] + 10,
                 ),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.3,
@@ -306,10 +295,23 @@ def process_image():
             )
             cv2.putText(
                 all_contours_img,
-                f"WorldPos: ({round(features[-1]['pos'].point.x,2)}, {round(features[-1]['pos'].point.y,2)}) Center: {features[-1]['center']}",
+                f"WorldPos: ({round(features[-1]['pos'].point.x,2)}, {round(features[-1]['pos'].point.y,2)})",
                 (
-                    get_center(filtered[i][j])[0] - 100,
-                    get_center(filtered[i][j])[1] - 90,
+                    get_center(filtered[i][j])[0] - 60,
+                    get_center(filtered[i][j])[1] + 20,
+                ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.3,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                all_contours_img,
+                f"Center: {features[-1]['center']}",
+                (
+                    get_center(filtered[i][j])[0] - 60,
+                    get_center(filtered[i][j])[1] + 30,
                 ),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.3,
@@ -321,8 +323,8 @@ def process_image():
                 all_contours_img,
                 f"Color: {features[-1]['color']} Angle: {features[-1]['orientation']}",
                 (
-                    get_center(filtered[i][j])[0] - 100,
-                    get_center(filtered[i][j])[1] - 70,
+                    get_center(filtered[i][j])[0] - 60,
+                    get_center(filtered[i][j])[1] + 40,
                 ),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.3,
@@ -331,14 +333,15 @@ def process_image():
                 cv2.LINE_AA,
             )
 
-    #plt.imshow(all_contours_img)
-    #plt.title("All contours in image")
-    # plt.gca().invert_yaxis()
-    #plt.show()
+    if debug:
+        plt.imshow(all_contours_img)
+        plt.title("All contours in image")
+        plt.show()
+        cv2.imwrite("annotated.png", cv2.cvtColor(all_contours_img, cv2.COLOR_RGB2BGR))
 
     return features
 
 
 if __name__ == "__main__":
-    feats = process_image()
-    #print(feats)
+    feats = process_image(capture_image=False, debug=True)
+    print(feats)
