@@ -110,6 +110,7 @@ def process(debug=False, down_sample:bool=True, voxel_size=0.001, table_dist_thr
         blocks.append(cluster)
         block_poses.append(get_pose(cluster))
     
+    # TODO distinguish between blocks and acrylic pieces
     return block_centers, block_poses, blocks
 
     
