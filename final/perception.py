@@ -2,7 +2,7 @@ import cv2
 import open3d as o3d
 import numpy as np
 import matplotlib.pyplot as plt
-from perception_helpers import convert_to_task_frame, get_aligned_frames
+from perception_helpers import convert_to_task_frame, get_aligned_frames, display_image, display_pcd, get_ply
 
 def capture_image(save_img:bool, cam_id:int = 0, file_name=''):
     """
@@ -35,7 +35,7 @@ def capture_image(save_img:bool, cam_id:int = 0, file_name=''):
 
     return frame
 
-def generate_pcd(color_img, depth_img):
+def generate_pcd(color_img, depth_img, filename='output.ply'):
     """
     Given a frame of the camera, generate a point cloud
     """
@@ -43,7 +43,8 @@ def generate_pcd(color_img, depth_img):
     # TODO figure out if we should do this from opencv or realsense
     # TODO maybe use https://www.open3d.org/docs/release/python_api/open3d.geometry.PointCloud.html#open3d.geometry.PointCloud.create_from_depth_image
     # TODO or use https://www.open3d.org/docs/release/python_api/open3d.geometry.PointCloud.html#open3d.geometry.PointCloud.create_from_depth_image
-    pcd = None
+    get_ply()
+    pcd = o3d.io.read_point_cloud(filename)
     return pcd
 
 def get_pose(block_pcd):
@@ -73,6 +74,10 @@ def process(debug=False, down_sample:bool=True, voxel_size=0.001, table_dist_thr
     # get image warped to task from using aruco markers
     task_img, task_depth_img = convert_to_task_frame(img, depth_img, debug)
 
+    if debug:
+        display_image(task_img)
+        display_image(task_depth_img) # TODO test
+
     pcd = generate_pcd(task_img, task_depth_img)
 
     # if down sampling id desired, use voxels to down sample
@@ -86,6 +91,9 @@ def process(debug=False, down_sample:bool=True, voxel_size=0.001, table_dist_thr
     # remove outliers
     pcd, idx = pcd.remove_statistical_outlier(nb_neighbors=nb_neighbors, std_ratio=std_ratio)
 
+    if debug:
+        display_pcd(pcd)
+
     # Ransac plane fitting + DBSCAN
     # TODO see if you can tune distance threshold to not have to do additional processing to find acrylic pieces
     plane_model, inliers = pcd.segment_plane(distance_threshold=0.001, ransac_n=3, num_iterations=1000)
@@ -97,6 +105,7 @@ def process(debug=False, down_sample:bool=True, voxel_size=0.001, table_dist_thr
 
     # get non-table points
     outlier_pcd = pcd.select_by_index(inliers, invert=True) # get non table points
+
     
     # run DBSCAN on outliers/blocks
     block_labels = outlier_pcd.cluster_dbscan(eps=eps, min_points=min_points, print_progress=debug)
@@ -109,6 +118,10 @@ def process(debug=False, down_sample:bool=True, voxel_size=0.001, table_dist_thr
         block_centers.append(centroid)
         blocks.append(cluster)
         block_poses.append(get_pose(cluster))
+    
+    if debug:
+        display_pcd(pcd.select_by_index(inliers))
+        display_pcd([outlier_pcd] + block_poses)
     
     # TODO distinguish between blocks and acrylic pieces
     return block_centers, block_poses, blocks
