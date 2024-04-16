@@ -6,11 +6,22 @@ import enum
 import matplotlib.pyplot as plt
 import compas.geometry as cg
 import pyrealsense2 as rs
+import open3d as o3d
+from typing import List
 
 # Dimensions from inner corner to inner corner
 width = 18 + 15 / 16  # 22.8125  # 10
 height = 11.75  # 15.75  # 7.5
 ppi = 32
+
+def display_image(img):
+    plt.imshow(img)
+    plt.show()
+
+def display_pcd(objs: List[o3d.geometry.PointCloud]):
+    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.1, origin=[0, 0, 0])
+    coordinate_frame.rotate(np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]]), center=[0, 0, 0])    # Rotate to match camera frame
+    o3d.visualization.draw_geometries([coordinate_frame] + objs)
 
 def get_aligned_frames():
     """
