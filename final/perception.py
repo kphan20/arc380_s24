@@ -127,3 +127,11 @@ def process(debug=False, down_sample:bool=True, voxel_size=0.001, table_dist_thr
     return block_centers, block_poses, blocks
 
     
+
+def process2d():
+
+    # do stuff
+
+    blocks = [{}]
+    acrylic = [{}]
+    return blocks, acrylic

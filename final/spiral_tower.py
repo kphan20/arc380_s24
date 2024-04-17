@@ -1,84 +1,52 @@
-import numpy as np
-from compas.geometry import Polygon, Rotation, Translation, Frame
 from control import EETaskHandler
-from perception import process
+from perception import process, process2d
+import json
 
-class SpiralCentroidCalculator:
-    """
-    Gets the centroids of the levels of the tower.
-    All of the centroids are on the perimeter of a circle that is centered
-    around the overall center of the tower, and they will all be evenly spaced
-    around the circle.
-    """
-
-    def __init__(self, num_positions: int, radius: float) -> None:
-        """
-        num_positions decides how many times the circle is partitioned
-        radius determines the distance from the center of the tower centroids are placed
-        """
-        self.r = radius
-        self.angles = [i * np.pi * 2 / num_positions for i in range(num_positions)]
-        self.curr_idx = 0
-
-    def get_centroid(self):
-        """
-        Gets position of next centroid in the tower
-        """
-        angle = self.angles[self.curr_idx]
-        self.curr_idx = (self.curr_idx + 1) % len(self.angles)
-
-        return self.r * np.cos(angle), self.r * np.sin(angle)
+def parse_json(filename):
+    with open(filename, "r") as f:
+        objects = json.load(f)
     
-class SpiralTriangleCalculator:
-    """
-    Gets positions that the next triangle of blocks should be places at
-    """
-    def __init__(self) -> None:
-        """
-        Creates a triangle polygon and rotation object (triangle is rotated 60 degrees at each level)
-        """
-        self.triangle = Polygon([[],[],[]])
-        self.rotation = Rotation.from_axis_and_angle([0, 0, 1], 60 * np.pi/180, self.triangle.centroid)
+    return objects
     
-    def get_triangle(self, centroid):
-        """
-        Rotates triangle and returns translated copy
-        """
-        self.triangle.transform(self.rotation)
-        return self.triangle.transformed(Translation.from_vector(centroid))
+def match_piece(obj, piece_list):
+    def get_dist(piece):
+        return 0 # TODO see how to get x, y of piece
+
+    x, y = obj["pos"][0], obj["pos"][1]
+    champ_ind = 0
+    champ_dist = get_dist(piece_list[0])
+    for idx, piece in enumerate(piece_list):
+        dist = get_dist(piece)
+        if dist < champ_dist:
+            champ_ind = idx
+            champ_dist = dist
+    
+    return champ_ind
 
 def main():
     try:
         handler = EETaskHandler()
 
-        # First centroid of the tower and overall centroid of the spiral
-        starting_frame = Frame()
-
-        # current_frame will be changed by the SpiralCentroidCalulator
-        current_frame = starting_frame
+        objects = parse_json("spiral_tower.json")
 
         # Get positions of blocks and pieces
-        poses, centroids, blocks = process()
-
-        spiral_centroids = SpiralCentroidCalculator()
-        block_placer = SpiralTriangleCalculator()
-
-        finished_building = False
+        blocks, acrylic = process2d()
 
         # 1. Clear space around starting frame for construction
         
         # 2. Begin loop
-        while not finished_building:
-            # 3. place down block triangle around current_frame
-
-            # 4. calculate next centroid
-            # TODO change get_centroid output to proper frame
-            current_frame = spiral_centroids.get_centroid()
-
-            # 5. place down acrylic piece at current_frame
-
-            # 6. check if tower is finished building
-            pass
+        for obj in objects:
+            # 3. Find corresponding piece from perception output
+            if obj["shape"] == "block":
+                search_list = blocks
+            else:
+                search_list = acrylic
+            
+            # TODO see if we need to convert rhino coordinates to world coords
+            search_idx = match_piece(obj, search_list)
+            piece = search_list.pop(search_idx)
+            
+            # 4. Move piece into proper location
     
     finally:
         handler.cleanup()
