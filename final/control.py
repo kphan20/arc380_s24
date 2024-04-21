@@ -1,5 +1,6 @@
 import compas_rrc as rrc
 import compas.geometry as cg
+import math
 
 def create_frame_from_points(
     point1: cg.Point, point2: cg.Point, point3: cg.Point
@@ -56,6 +57,7 @@ class EETaskHandler:
         self.ros = ros
         self.abb_rrc = abb_rrc
         self.task_frame = task_frame
+        self.is_gripper_on = True
         self.gripper_off()
 
     def cleanup(self):
@@ -69,8 +71,30 @@ class EETaskHandler:
         if self.is_gripper_on:
             self.gripper_off()
 
-        home = rrc.RobotJoints([0, 0, 0, 0, 90, 320])
+        home = rrc.RobotJoints([0, 0, 0, 0, 90, 60])
         _ = self.abb_rrc.send_and_wait(rrc.MoveToJoints(home, [], speed, rrc.Zone.FINE))
+
+    def intermediate(self, speed):
+        """
+        Hard coded intermediate point
+        """
+        intermediate = rrc.RobotJoints([70, 0, 0, 0, 90, 60])
+        _ = self.abb_rrc.send_and_wait(
+            rrc.MoveToJoints(intermediate, [], speed, rrc.Zone.FINE)
+        )
+
+    def rotate(self, speed, rotation):
+        """
+        Rotate the arm in place after reaching the block
+        """
+        angles, _ = self.abb_rrc.send_and_wait(
+            rrc.GetJoints()
+        )
+        angles.rax_6 = 153 + rotation # TODO 153 is where gripper is horizontal - may need to change this
+        print(angles)
+        _ = self.abb_rrc.send_and_wait(
+            rrc.MoveToJoints(angles, [], speed, rrc.Zone.FINE)
+        )
 
     def lift_frame(self, frame: cg.Frame, lifted_height=40):
         """
@@ -94,7 +118,9 @@ class EETaskHandler:
         """
         Move 
         """
-        frame = cg.Frame(dest.point, [1, 0, 0], [0, -1, 0])
+        #frame = cg.Frame(dest.point, [1, 0, 0], [0, -1, 0])
+        # rotate around x axis rather than redefining axes
+        frame = dest.rotated(math.pi, cg.Vector.Xaxis(), dest.point) # TODO see if this works
         _ = self.abb_rrc.send_and_wait(
             rrc.MoveToFrame(frame, speed, rrc.Zone.FINE, rrc.Motion.LINEAR)
         )

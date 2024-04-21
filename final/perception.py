@@ -1,8 +1,8 @@
 import cv2
-import open3d as o3d
 import numpy as np
 import matplotlib.pyplot as plt
-from perception_helpers import convert_to_task_frame, get_aligned_frames, display_image, display_pcd, get_ply
+from perception_helpers import Color, Shape, convert_to_task_frame, detect_shape, get_aligned_frames, display_image, display_pcd, get_center, get_orientation, get_ply, get_world_pos, task_to_world_frame
+import math
 
 def capture_image(save_img:bool, cam_id:int = 0, file_name=''):
     """
@@ -35,103 +35,155 @@ def capture_image(save_img:bool, cam_id:int = 0, file_name=''):
 
     return frame
 
-def generate_pcd(color_img, depth_img, filename='output.ply'):
-    """
-    Given a frame of the camera, generate a point cloud
-    """
+def filter_kmeans(contour, is_block):
+        area = cv2.contourArea(contour)
+        if area < 900 or area > 10000:
+            return False
+        rect = cv2.minAreaRect(contour)
+        h, w = rect[1]
+        is_square = 0.9 < h/w < 1.1
+        return not is_square if is_block else is_square
 
-    # TODO figure out if we should do this from opencv or realsense
-    # TODO maybe use https://www.open3d.org/docs/release/python_api/open3d.geometry.PointCloud.html#open3d.geometry.PointCloud.create_from_depth_image
-    # TODO or use https://www.open3d.org/docs/release/python_api/open3d.geometry.PointCloud.html#open3d.geometry.PointCloud.create_from_depth_image
-    get_ply()
-    pcd = o3d.io.read_point_cloud(filename)
-    return pcd
+def process2d(debug=False, take_image=True, cam_id = 1):
 
-def get_pose(block_pcd):
-    """
-    Given a point cloud of a block, get the principle axes
-    """
-    points = np.asarray(block_pcd.points)
-    mean = np.mean(points, axis=0)
-    centered_points = points - mean
-    cov = np.cov(centered_points.T)
-    u, sigma, v_transpose = np.linalg.svd(cov)
-    v = v_transpose.T
-    cluster_axes = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.05, origin=mean)
-    cluster_axes.rotate(v, center=mean)
-    return cluster_axes
+    if take_image:
+        # snap image from camera and save
+        capture_image(True, cam_id, "raw_img.png")
 
-def process(debug=False, down_sample:bool=True, voxel_size=0.001, table_dist_threshold=0.5, nb_neighbors=20, std_ratio=2, eps=.005, min_points=10):
-    """
-    Extract the blocks and acrylic pieces from sensors
-    """
+    # get image and convert to cv2 image
+    img = cv2.imread("raw_img.png")
 
-    # TODO see if we can use built in pyrealsense functions to process depth images
-    # img, depth_img = get_aligned_frames()
-    img = capture_image(False, 0)
-    depth_img = capture_image(False, 1)
+    # get corrected image
+    img = convert_to_task_frame(img, debug=debug)
 
-    # get image warped to task from using aruco markers
-    task_img, task_depth_img = convert_to_task_frame(img, depth_img, debug)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
+    # finds blocks through thresholding
+    ret,thresh = cv2.threshold(gray,100,255,0)
+    blocks,hierarchy = cv2.findContours(thresh, 1, 2)
+    # print("Number of contours detected:", len(contours))
+    block_contours = [block for block in blocks if cv2.contourArea(block) > 1000]
     if debug:
-        display_image(task_img)
-        display_image(task_depth_img) # TODO test
-
-    pcd = generate_pcd(task_img, task_depth_img)
-
-    # if down sampling id desired, use voxels to down sample
-    if down_sample:
-        pcd = pcd.voxel_down_sample(voxel_size=voxel_size)
-
-    # Get points with z-distance below table_dist_threshold
-    point_arr = np.asarray(pcd.points)
-    pcd = pcd.select_by_index(np.where(np.abs(point_arr[:, 2])) < table_dist_threshold)[0]
-
-    # remove outliers
-    pcd, idx = pcd.remove_statistical_outlier(nb_neighbors=nb_neighbors, std_ratio=std_ratio)
-
-    if debug:
-        display_pcd(pcd)
-
-    # Ransac plane fitting + DBSCAN
-    # TODO see if you can tune distance threshold to not have to do additional processing to find acrylic pieces
-    plane_model, inliers = pcd.segment_plane(distance_threshold=0.001, ransac_n=3, num_iterations=1000)
-    [a, b, c, d] = plane_model # most likely gives table plane, might not distinguish acrylic pieces
+        bruh = cv2.drawContours(img.copy(), block_contours, -1, (0, 255, 0), 3)
+        plt.imshow(bruh)
+        plt.show()
     
-    # get the normal vector for all objects (assume that all have the same normal)
-    norm_vector = np.array([a, b, c])
-    norm_vector /= np.linalg.norm(norm_vector)
+    block_info = list()
+    for c in block_contours:
+        block_info.append(
+                {
+                    "shape": "block",
+                    "color": "",
+                    "size": cv2.contourArea(c),
+                    "pos": get_world_pos(c),
+                    "orientation": get_orientation(
+                        c, ("Square", Shape.SQUARE)
+                    ),
+                }
+            )
 
-    # get non-table points
-    outlier_pcd = pcd.select_by_index(inliers, invert=True) # get non table points
+    # Run k-means clustering on the image to find the acrylic pieces
+    acrylic_squares, large_disks, small_disks = list(), list(), list()
 
-    
-    # run DBSCAN on outliers/blocks
-    block_labels = outlier_pcd.cluster_dbscan(eps=eps, min_points=min_points, print_progress=debug)
-    block_centers = list()
-    blocks = list()
-    block_poses = list()
-    for label in np.unique(block_labels):
-        cluster = outlier_pcd.select_by_index(np.where(block_labels == label)[0])
-        centroid = np.asarray(cluster.get_center())
-        block_centers.append(centroid)
-        blocks.append(cluster)
-        block_poses.append(get_pose(cluster))
-    
-    if debug:
-        display_pcd(pcd.select_by_index(inliers))
-        display_pcd([outlier_pcd] + block_poses)
-    
-    # TODO distinguish between blocks and acrylic pieces
-    return block_centers, block_poses, blocks
+    # Reshape our image data to a flattened list of RGB values
+    img_data = img.reshape((-1, 3))
 
-    
+    img_data = np.float32(img_data)
 
-def process2d():
+    # Define the number of clusters
+    k = 5
 
-    # do stuff
+    # Define the criteria for the k-means algorithm
+    # This is a tuple with three elements: (type of termination criteria, maximum number of iterations, epsilon/required accuracy)
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
 
-    blocks = [{}]
-    acrylic = [{}]
-    return blocks, acrylic
+    # Run the k-means algorithm
+    # Parameters: data, number of clusters, best labels, criteria, number of attempts, initial centers
+    _, labels, centers = cv2.kmeans(
+        img_data, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS
+    )
+
+    centers = np.uint8(centers)
+
+    # Rebuild the image using the labels and centers
+    kmeans_data = centers[labels.flatten()]
+    kmeans_img = kmeans_data.reshape(img.shape)
+    labels = labels.reshape(img.shape[:2])
+
+    filtered = []
+    for label in range(k):
+        mask_img = np.zeros(kmeans_img.shape[:2], dtype="uint8")
+        mask_img[labels == label] = 255
+
+        contours, _ = cv2.findContours(
+            mask_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+        )
+
+        contours = [contour for contour in contours if filter_kmeans(contour, False)]
+        areas = [cv2.contourArea(contour) for contour in contours]
+
+        if debug:
+            print(f"Area of each region: {areas}")
+            contour_img = img.copy()
+            if len(contours) != 0:
+                print(f"Number of filtered regions: {len(contours)}")
+                # print color of region
+                mean_val = cv2.mean(kmeans_img, mask=mask_img)
+                print(f"Mean color of region: {mean_val[:3]}")
+                cv2.drawContours(contour_img, contours, -1, (0, 255, 0), 3)
+
+                plt.imshow(contour_img)
+                plt.title(f"Contour image for cluster {label}")
+                plt.gca().invert_yaxis()
+                plt.show()
+            contour_img = img.copy()
+
+        if len(contours) > 0:
+            filtered.append(contours)
+
+    all_contours_img = img.copy()
+
+    for i in range(len(filtered)):
+        mask = np.zeros(kmeans_img.shape[:2], dtype="uint8")
+        cv2.drawContours(mask, filtered[i], -1, 255, -1)
+        mean_val = cv2.mean(kmeans_img, mask=mask)
+        # print(f"Mean color of region: {mean_val[:3]}")
+
+        if mean_val[0] > 120:
+            color = Color.YELLOW
+        elif mean_val[0] > 50 and mean_val[1] < 50:
+            color = Color.RED
+        else:
+            color = Color.BLUE
+        
+        if debug:
+            print(mean_val)
+            plt.imshow(mask)
+            plt.show()
+        
+        for j in range(len(filtered[i])):
+            orientation = get_orientation(
+                        filtered[i][j], detect_shape(filtered[i][j])
+                    )
+            info = {
+                    "shape": detect_shape(filtered[i][j])[0],
+                    "color": color,
+                    "size": cv2.contourArea(filtered[i][j]),
+                    "pos": get_world_pos(filtered[i][j], orientation* math.pi / 180),
+                    "orientation": orientation,
+            }
+            if info["shape"] == "Square":
+                acrylic_squares.append(info)
+            elif info["size"] > 6000:
+                large_disks.append(info)
+            else:
+                small_disks.append(info)
+
+    # blocks, large disks, squares, small disk
+    # TODO see if dividing by color would help
+    return block_info, large_disks, acrylic_squares, small_disks
+
+
+if __name__ == "__main__":
+    #bruh = process(True, False)[1]
+    _, a, b, c = process2d(True, False)
