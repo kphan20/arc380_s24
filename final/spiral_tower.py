@@ -126,14 +126,14 @@ def main(use_handler=False, debug=False):
             handler.lift_and_move_to_world_frame(piece["pos"], speed, obj["pos"].point.z + 20)
 
             # move over tower
-            handler.lift_and_move_to_world_frame(obj["pos"], speed, obj["pos"].point.z + 20)
+            handler.lift_and_move_to_world_frame(obj["pos"], speed, 20)
 
             # move piece to tower
-            handler.move_to_world_frame(obj["pos"], speed)
+            handler.lift_and_move_to_world_frame(obj["pos"], speed, 2)
             handler.gripper_off()
 
             # move back up
-            handler.lift_and_move_to_world_frame(obj["pos"], speed, obj["pos"].point.z + 20)
+            handler.lift_and_move_to_world_frame(obj["pos"], speed, 20)
 
             curr_tower_height = max(curr_tower_height, obj["pos"].point.z)
         print(f"Reached index {idx}")
