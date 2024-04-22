@@ -83,14 +83,14 @@ class EETaskHandler:
             rrc.MoveToJoints(intermediate, [], speed, rrc.Zone.FINE)
         )
 
-    def rotate(self, speed, rotation):
+    def rotate(self, speed, rotation, init_position=153):
         """
         Rotate the arm in place after reaching the block
         """
         angles, _ = self.abb_rrc.send_and_wait(
             rrc.GetJoints()
         )
-        angles.rax_6 = 153 + rotation # TODO 153 is where gripper is horizontal - may need to change this
+        angles.rax_6 = init_position + rotation # TODO 153 is where gripper is horizontal - may need to change this
         print(angles)
         _ = self.abb_rrc.send_and_wait(
             rrc.MoveToJoints(angles, [], speed, rrc.Zone.FINE)

@@ -70,17 +70,24 @@ def process2d(debug=False, take_image=True, cam_id = 1):
     
     block_info = list()
     for c in block_contours:
+        orientation = get_orientation(c, ("Square", Shape.SQUARE))
+        w, h = cv2.minAreaRect(c)[1]
+        if w > h: # adjustment for blocks near vertical
+            orientation += 90 # TODO see if we should adjust range to [-90, 90]
         block_info.append(
                 {
                     "shape": "block",
                     "color": "",
                     "size": cv2.contourArea(c),
-                    "pos": get_world_pos(c),
-                    "orientation": get_orientation(
-                        c, ("Square", Shape.SQUARE)
-                    ),
+                    "pos": get_world_pos(c, orientation * math.pi / 180),
+                    "orientation": orientation,
                 }
             )
+        if debug:
+            print(block_info[-1]["orientation"])
+            bruh = cv2.drawContours(img.copy(), [c], -1, (0, 255, 0), 3)
+            plt.imshow(bruh)
+            plt.show()
 
     # Run k-means clustering on the image to find the acrylic pieces
     acrylic_squares, large_disks, small_disks = list(), list(), list()
@@ -174,6 +181,11 @@ def process2d(debug=False, take_image=True, cam_id = 1):
             }
             if info["shape"] == "Square":
                 acrylic_squares.append(info)
+                if debug:
+                    print(info["orientation"])
+                    bruh = cv2.drawContours(img.copy(), [filtered[i][j]], -1, (0, 255, 0), 3)
+                    plt.imshow(bruh)
+                    plt.show()
             elif info["size"] > 6000:
                 large_disks.append(info)
             else:
@@ -186,4 +198,4 @@ def process2d(debug=False, take_image=True, cam_id = 1):
 
 if __name__ == "__main__":
     #bruh = process(True, False)[1]
-    _, a, b, c = process2d(True, False)
+    _, a, b, c = process2d(False, False)

@@ -3,6 +3,7 @@ from perception import process2d
 from perception_helpers import Color, task_to_world_frame
 import json
 import compas.geometry as cg
+import math
 
 def parse_json(filename):
     with open(filename, "r") as f:
@@ -67,7 +68,7 @@ def main(use_handler=False, debug=False):
         objects = parse_json("spiral_tower.json")
 
         # Get positions of blocks and pieces
-        blocks, acrylic_disks, acrylic_squares, small_disks = process2d(debug=debug, take_image=False)
+        blocks, acrylic_disks, acrylic_squares, small_disks = process2d(take_image=False)
 
         curr_tower_height = 0
         # 1. Clear space around starting frame for construction
@@ -114,19 +115,27 @@ def main(use_handler=False, debug=False):
             if obj["shape"] == "block":
                 # adjust z for block
                 handler.lift_and_move_to_world_frame(piece["pos"], speed, 16)
-                handler.rotate(40, piece["orientation"])
+                #handler.rotate(40, piece["orientation"])
                 # turn gripper on
-                handler.gripper_on()
+                if not debug:
+                    handler.gripper_on()
             else:
                 handler.lift_and_move_to_world_frame(piece["pos"], speed, 4)
                 # turn gripper on
-                handler.gripper_on()
+                if not debug:
+                    handler.gripper_on()
 
             # move back up
             handler.lift_and_move_to_world_frame(piece["pos"], speed, obj["pos"].point.z + 20)
 
             # move over tower
             handler.lift_and_move_to_world_frame(obj["pos"], speed, 20)
+
+            # rotate to correct orientation
+            # obj_degrees = obj["rot"] * 180 / math.pi
+            # if obj_degrees > 180.0:
+            #     obj_degrees -= 180
+            # handler.rotate(speed, obj_degrees)
 
             # move piece to tower
             handler.lift_and_move_to_world_frame(obj["pos"], speed, 2)
