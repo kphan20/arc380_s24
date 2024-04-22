@@ -108,11 +108,32 @@ def main(use_handler=False, debug=False):
                 continue
             
             print(piece)
+            # move over piece
+            handler.lift_and_move_to_world_frame(piece["pos"], speed, obj["pos"].point.z + 20)
+            # must adjust height of grabber for block vs disk
             if obj["shape"] == "block":
-                handler.lift_and_move_to_world_frame(piece["pos"], speed)
+                # adjust z for block
+                handler.lift_and_move_to_world_frame(piece["pos"], speed, 16)
                 handler.rotate(40, piece["orientation"])
+                # turn gripper on
+                handler.gripper_on()
             else:
-                handler.lift_and_move_to_world_frame(piece["pos"], speed)
+                handler.lift_and_move_to_world_frame(piece["pos"], speed, 4)
+                # turn gripper on
+                handler.gripper_on()
+
+            # move back up
+            handler.lift_and_move_to_world_frame(piece["pos"], speed, obj["pos"].point.z + 20)
+
+            # move over tower
+            handler.lift_and_move_to_world_frame(obj["pos"], speed, obj["pos"].point.z + 20)
+
+            # move piece to tower
+            handler.move_to_world_frame(obj["pos"], speed)
+            handler.gripper_off()
+
+            # move back up
+            handler.lift_and_move_to_world_frame(obj["pos"], speed, obj["pos"].point.z + 20)
 
             curr_tower_height = max(curr_tower_height, obj["pos"].point.z)
         print(f"Reached index {idx}")
