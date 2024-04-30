@@ -9,6 +9,7 @@ import pyrealsense2 as rs
 import open3d as o3d
 from typing import List
 import time
+import math
 
 # Dimensions from inner corner to inner corner
 width = 18 + 15 / 16  # 22.8125  # 10
@@ -208,6 +209,8 @@ class Color(enum.Enum):
     RED=0
     YELLOW=1
     BLUE=2
+    CYAN=3
+    PINK=4
 
 def detect_shape(contour, circle_threshold=0.8) -> Shape:
     smoothed = cv2.approxPolyDP(contour, 0.04 * cv2.arcLength(contour, True), True)
@@ -233,7 +236,7 @@ def get_orientation(contour, shape):
     else:
         return round(90 - cv2.minAreaRect(contour)[-1], 2)
 
-def get_world_pos(contour, orientation=0.0):
+def get_world_pos(contour, orientation=0.0, is_circle=False):
     """
     Given a contour, calculate the world position based on the trained points
     """
@@ -251,9 +254,26 @@ def get_world_pos(contour, orientation=0.0):
     y_mm = y_in * 25.4
 
     ee_frame_t = cg.Frame(cg.Point(x_mm, y_mm), [1, 0, 0], [0, 1, 0])
-    ee_frame_t.rotate(orientation, point = ee_frame_t.point) # added rotation here, but it doesn't seem to work
+    ee_frame_t.rotate(orientation, point = ee_frame_t.point)
     ee_frame_w = task_to_world_frame(ee_frame_t)
-    #ee_frame_w.point.x += 5 TODO see if we need this
+    print("Without Adjustment:")
+    print(ee_frame_w)
+    ee_frame_w.point.y -= 6
+    ee_frame_w.point.x += 6
+    r = 4
+    if is_circle:
+        ee_frame_w.point.y -= 2 #14 *  math.sin(orientation) #TODO see if we need this
+        ee_frame_w.point.x += 2 #14 * abs(math.cos(orientation))
+        print("IS CIRCLE")
+    else:
+        orientation += math.pi / 2
+        ee_frame_w.point.y += r * math.sin(orientation)
+        ee_frame_w.point.x += r * math.cos(orientation)
+        # r = 8
+        # ee_frame_w.point.y += r * math.sin(orientation)
+        # ee_frame_w.point.x += r * math.cos(orientation)
+    # print("With Adjustment:")
+    # print(ee_frame_w)
 
     return ee_frame_w
 

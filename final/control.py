@@ -49,9 +49,9 @@ class EETaskHandler:
         print("Connected.")
 
         abb_rrc.send(rrc.SetTool("vac_gripper"))
-        x_axis = cg.Point(-236.99, 498.73, 21.31)
-        origin = cg.Point(241.78, 485.88, 21.1)
-        other_point = cg.Point(235.89, 193.29, 21.34)
+        x_axis = cg.Point(-232.15, 485.06, 21.31)
+        origin = cg.Point(246.25, 482.21, 21.1)
+        other_point = cg.Point(237.64, 187.06, 21.34)
         task_frame = create_frame_from_points(origin, x_axis, other_point)
 
         self.ros = ros
@@ -87,9 +87,10 @@ class EETaskHandler:
         """
         Rotate the arm in place after reaching the block
         """
-        angles, _ = self.abb_rrc.send_and_wait(
+        angles, external_axes = self.abb_rrc.send_and_wait(
             rrc.GetJoints()
         )
+        print(external_axes)
         angles.rax_6 = init_position + rotation # TODO 153 is where gripper is horizontal - may need to change this
         print(angles)
         _ = self.abb_rrc.send_and_wait(
